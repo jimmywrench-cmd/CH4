@@ -1,0 +1,71 @@
+import { NextRequest, NextResponse } from "next/server";
+import { query } from "@/lib/db";
+import { requireUser, requireStaff } from "@/lib/guard";
+
+// GET /api/submissions?status=pending  (staff sees queue; anyone can filter their own via ?mine=1)
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const status = searchParams.get("status");
+  const mine = searchParams.get("mine");
+
+  const guarded = await requireUser();
+  if ("error" in guarded) return guarded.error;
+
+  const conditions: string[] = [];
+  const params: any[] = [];
+
+  if (status) {
+    params.push(status);
+    conditions.push(`s.status = $${params.length}`);
+  }
+  if (mine) {
+    params.push(guarded.user.id);
+    conditions.push(`s.user_id = $${params.length}`);
+  }
+
+  const where = conditions.length ? `where ${conditions.join(" and ")}` : "";
+
+  const rows = await query(
+    `select s.id, s.title, s.description, s.video_path, s.status, s.level_at_submit,
+            s.created_at, s.reviewed_at,
+            u.id as user_id, u.username, u.level as current_level
+     from submissions s
+     join users u on u.id = s.user_id
+     ${where}
+     order by s.created_at desc`,
+    params
+  );
+
+  return NextResponse.json({ submissions: rows });
+}
+
+// POST /api/submissions  { title, description, video_path }
+export async function POST(req: NextRequest) {
+  const guarded = await requireUser();
+  if ("error" in guarded) return guarded.error;
+
+  let body: { title?: string; description?: string; video_path?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const title = (body.title || "").trim();
+  const description = (body.description || "").trim();
+  if (!title) {
+    return NextResponse.json({ error: "Title is required." }, { status: 400 });
+  }
+  if (!body.video_path) {
+    return NextResponse.json({ error: "A trimmed clip must be uploaded first." }, { status: 400 });
+  }
+
+  const rows = await query(
+    `insert into submissions (user_id, title, description, video_path, level_at_submit)
+     values ($1, $2, $3, $4, $5)
+     returning id, title, description, video_path, status, level_at_submit, created_at`,
+    [guarded.user.id, title, description, body.video_path, guarded.user.level]
+  );
+
+  return NextResponse.json({ submission: rows[0] });
+}
