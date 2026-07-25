@@ -112,6 +112,17 @@ export async function DELETE(
     return NextResponse.json({ error: "You can't delete your own account here." }, { status: 400 });
   }
 
-  await query(`delete from users where id = $1`, [id]);
-  return NextResponse.json({ ok: true });
+  try {
+    // Clear nullable FK references so delete isn't blocked by past reviews/announcements.
+    await query(`update submissions set reviewed_by = null where reviewed_by = $1`, [id]);
+    await query(`update announcements set posted_by = null where posted_by = $1`, [id]);
+
+    const rows = await query<{ id: string }>(`delete from users where id = $1 returning id`, [id]);
+    if (!rows[0]) {
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: "Could not delete user." }, { status: 500 });
+  }
 }

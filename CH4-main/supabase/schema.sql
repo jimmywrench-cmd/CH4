@@ -71,7 +71,7 @@ create table if not exists public.submissions (
   level_at_submit int not null,
   created_at   timestamptz not null default now(),
   reviewed_at  timestamptz,
-  reviewed_by  uuid references public.users(id)
+  reviewed_by  uuid references public.users(id) on delete set null
 );
 
 create index if not exists submissions_status_idx on public.submissions (status, created_at desc);
@@ -99,7 +99,7 @@ create table if not exists public.announcements (
   id          bigint generated always as identity primary key,
   title       text not null,
   body        text not null,
-  posted_by   uuid references public.users(id),
+  posted_by   uuid references public.users(id) on delete set null,
   created_at  timestamptz not null default now()
 );
 

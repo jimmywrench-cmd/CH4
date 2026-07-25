@@ -101,14 +101,15 @@ export default function DashboardView({
     toast(`${u.username} ${u.suspended ? "unsuspended" : "suspended"}.`);
     loadUsers();
   }
-  async function banUser(u: any) {
+  async function toggleBan(u: any) {
     const res = await fetch(`/api/users/${u.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ banned: true }),
+      body: JSON.stringify({ banned: !u.banned }),
     });
-    if (!res.ok) return toast("Could not ban.");
-    toast(`${u.username} has been banned.`);
+    const data = await res.json();
+    if (!res.ok) return toast(data.error || "Could not update ban status.");
+    toast(`${u.username} ${u.banned ? "unbanned" : "banned"}.`);
     loadUsers();
   }
   async function deleteUser(u: any) {
@@ -304,8 +305,8 @@ export default function DashboardView({
                         <button className="btn btn-ghost btn-sm" onClick={() => toggleSuspend(u)}>
                           {u.suspended ? "Unsuspend" : "Suspend"}
                         </button>
-                        <button className="btn btn-danger btn-sm" onClick={() => banUser(u)}>
-                          Ban
+                        <button className="btn btn-danger btn-sm" onClick={() => toggleBan(u)}>
+                          {u.banned ? "Unban" : "Ban"}
                         </button>
                         <button className="btn btn-danger btn-sm" onClick={() => deleteUser(u)}>
                           Delete
