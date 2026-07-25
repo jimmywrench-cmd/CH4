@@ -8,7 +8,7 @@ export async function GET() {
 
   const rows = await query(
     `select m.id, m.text, m.reply_to_id, m.pinned, m.created_at,
-            u.id as user_id, u.username, u.role, u.level,
+            u.id as user_id, u.username, u.role, u.level, u.level_label,
             r.id as reply_user_id, r.username as reply_username, rm.text as reply_text
      from chat_messages m
      join users u on u.id = m.user_id
@@ -25,6 +25,13 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const guarded = await requireUser();
   if ("error" in guarded) return guarded.error;
+
+  if (guarded.user.suspended) {
+    return NextResponse.json(
+      { error: "You're suspended and can't chat right now." },
+      { status: 403 }
+    );
+  }
 
   let body: { text?: string; reply_to_id?: number | null };
   try {

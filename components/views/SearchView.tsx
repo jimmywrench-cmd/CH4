@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Rank, rankForLevel } from "@/lib/ranks";
+import { Rank, rankForLevel, displayRankName } from "@/lib/ranks";
 import RoleBadge from "../RoleBadge";
 
 export default function SearchView({ query, ranks }: { query: string; ranks: Rank[] }) {
@@ -20,7 +20,8 @@ export default function SearchView({ query, ranks }: { query: string; ranks: Ran
           u.username.toLowerCase().includes(q) ||
           u.role.toLowerCase().includes(q) ||
           rankForLevel(ranks, u.level).name.toLowerCase().includes(q) ||
-          `level ${u.level}`.includes(q)
+          `level ${u.level}`.includes(q) ||
+          (u.level_label && u.level_label.toLowerCase().includes(q))
       )
     : [];
 
@@ -40,7 +41,7 @@ export default function SearchView({ query, ranks }: { query: string; ranks: Ran
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: 13.5 }}>{u.username}</div>
                 <div className="muted small">
-                  Level {u.level} · {rankForLevel(ranks, u.level).name}
+                  {u.level_label ? u.level_label : `Level ${u.level} · ${displayRankName(ranks, u)}`}
                 </div>
               </div>
               <RoleBadge role={u.role} />

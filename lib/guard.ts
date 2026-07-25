@@ -9,11 +9,6 @@ export async function requireUser(): Promise<
   if (!user) {
     return { error: NextResponse.json({ error: "Not signed in." }, { status: 401 }) };
   }
-  if (user.suspended) {
-    return {
-      error: NextResponse.json({ error: "Your account is suspended." }, { status: 403 }),
-    };
-  }
   return { user };
 }
 

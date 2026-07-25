@@ -10,7 +10,7 @@ export async function PATCH(
   const guarded = await requireAdmin();
   if ("error" in guarded) return guarded.error;
 
-  let body: { min_level?: number; name?: string };
+  let body: { min_level?: number; name?: string; max_level?: number | null };
   try {
     body = await req.json();
   } catch {
@@ -34,6 +34,18 @@ export async function PATCH(
     values.push(v);
     sets.push(`name = $${values.length}`);
   }
+  if (body.max_level !== undefined) {
+    if (body.max_level === null) {
+      sets.push(`max_level_override = null`);
+    } else {
+      const v = Number(body.max_level);
+      if (!Number.isFinite(v) || v < 1) {
+        return NextResponse.json({ error: "Invalid max level." }, { status: 400 });
+      }
+      values.push(v);
+      sets.push(`max_level_override = $${values.length}`);
+    }
+  }
   if (!sets.length) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
@@ -41,7 +53,7 @@ export async function PATCH(
   values.push(id);
   const rows = await query(
     `update ranks set ${sets.join(", ")} where id = $${values.length}
-     returning id, name, min_level, sort_order`,
+     returning id, name, min_level, sort_order, max_level_override`,
     values
   );
   if (!rows[0]) return NextResponse.json({ error: "Rank not found." }, { status: 404 });

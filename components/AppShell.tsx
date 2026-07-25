@@ -167,7 +167,8 @@ export default function AppShell() {
             <div style={{ minWidth: 0 }}>
               <div className="uc-name">{user.username}</div>
               <div className="uc-role">
-                {user.role} · Level {user.level}
+                {user.role === "Admin" ? "Co-Owner" : user.role} ·{" "}
+                {user.level_label ?? `Level ${user.level}`}
               </div>
             </div>
           </div>

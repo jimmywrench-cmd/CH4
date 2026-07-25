@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/guard";
 
 export async function GET() {
   const rows = await query(
-    `select id, name, min_level, sort_order from ranks order by sort_order asc`
+    `select id, name, min_level, sort_order, max_level_override from ranks order by sort_order asc`
   );
   return NextResponse.json({ ranks: rows });
 }

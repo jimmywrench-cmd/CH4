@@ -22,6 +22,7 @@ export type PublicUser = {
   username: string;
   role: "Member" | "Verified" | "Moderator" | "Admin" | "Owner";
   level: number;
+  level_label: string | null;
   bio: string;
   avatar_seed: string;
   approved_count: number;
@@ -31,7 +32,7 @@ export type PublicUser = {
   created_at: string;
 };
 
-const USER_FIELDS = `id, username, role, level, bio, avatar_seed, approved_count, rejected_count, suspended, banned, created_at`;
+const USER_FIELDS = `id, username, role, level, level_label, bio, avatar_seed, approved_count, rejected_count, suspended, banned, created_at`;
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
 

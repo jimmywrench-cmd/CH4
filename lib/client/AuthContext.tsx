@@ -9,6 +9,7 @@ export type SessionUser = {
   username: string;
   role: Role;
   level: number;
+  level_label: string | null;
   bio: string;
   avatar_seed: string;
   approved_count: number;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { requireUser, requireStaff } from "@/lib/guard";
+import { createSignedPlaybackUrl } from "@/lib/storage";
 
 // GET /api/submissions?status=pending  (staff sees queue; anyone can filter their own via ?mine=1)
 export async function GET(req: NextRequest) {
@@ -36,7 +37,20 @@ export async function GET(req: NextRequest) {
     params
   );
 
-  return NextResponse.json({ submissions: rows });
+  const withUrls = await Promise.all(
+    rows.map(async (row: any) => {
+      if (!row.video_path) return row;
+      try {
+        const video_url = await createSignedPlaybackUrl(row.video_path);
+        return { ...row, video_url };
+      } catch (err) {
+        console.error("Failed to sign playback URL for", row.video_path, err);
+        return row;
+      }
+    })
+  );
+
+  return NextResponse.json({ submissions: withUrls });
 }
 
 // POST /api/submissions  { title, description, video_path }

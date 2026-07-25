@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Rank, rankForLevel } from "@/lib/ranks";
+import { Rank, rankForLevel, displayRankName } from "@/lib/ranks";
 import RoleBadge from "../RoleBadge";
 
 const TABS: { key: string; label: string }[] = [
@@ -55,8 +55,8 @@ export default function LeaderboardView({ ranks }: { ranks: Rank[] }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 13.5 }}>{u.username}</div>
                 <div className="muted small">
-                  Level {u.level} · {rankForLevel(ranks, u.level).name} · {u.approved_count}{" "}
-                  approved
+                  {u.level_label ? u.level_label : `Level ${u.level} · ${displayRankName(ranks, u)}`} ·{" "}
+                  {u.approved_count} approved
                 </div>
               </div>
               <RoleBadge role={u.role} />

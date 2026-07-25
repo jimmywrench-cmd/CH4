@@ -4,7 +4,12 @@ import { requireAdmin } from "@/lib/guard";
 
 export async function GET() {
   const rows = await query(
-    `select id, title, body, created_at from announcements order by created_at desc limit 20`
+    `select a.id, a.title, a.body, a.created_at,
+            u.username as posted_by_username, u.role as posted_by_role
+     from announcements a
+     left join users u on u.id = a.posted_by
+     order by a.created_at desc
+     limit 20`
   );
   return NextResponse.json({ announcements: rows });
 }

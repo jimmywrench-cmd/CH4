@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Rank, rankForLevel } from "@/lib/ranks";
+import { Rank, rankForLevel, displayRankName } from "@/lib/ranks";
 import RoleBadge from "../RoleBadge";
 import { ViewName } from "../AppShell";
 
@@ -49,7 +49,7 @@ export default function HomeView({
         </p>
         <div className="flex gap12">
           <button className="btn btn-primary" onClick={() => go("submit")}>
-            Join the Queue
+            Submit Clip
           </button>
           <button className="btn btn-ghost" onClick={() => go("leaderboard")}>
             View Leaderboard
@@ -83,13 +83,24 @@ export default function HomeView({
             ) : (
               announcements.map((a) => (
                 <div key={a.id} className="activity-item">
-                  <div>
+                  <div style={{ width: "100%" }}>
                     <div style={{ fontWeight: 700, fontSize: 13.5 }}>{a.title}</div>
                     <div className="muted small" style={{ marginTop: 2 }}>
                       {a.body}
                     </div>
-                    <div className="muted small" style={{ marginTop: 4 }}>
-                      {new Date(a.created_at).toLocaleString()}
+                    <div
+                      className="flex gap8"
+                      style={{ marginTop: 6, alignItems: "center", flexWrap: "wrap" }}
+                    >
+                      {a.posted_by_username && (
+                        <span className="small" style={{ fontWeight: 600 }}>
+                          {a.posted_by_username}
+                        </span>
+                      )}
+                      {a.posted_by_role && <RoleBadge role={a.posted_by_role} />}
+                      <span className="muted small">
+                        {new Date(a.created_at).toLocaleString()}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -132,7 +143,7 @@ export default function HomeView({
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 13.5 }}>{u.username}</div>
                   <div className="muted small">
-                    Level {u.level} · {rankForLevel(ranks, u.level).name}
+                    {u.level_label ? u.level_label : `Level ${u.level} · ${displayRankName(ranks, u)}`}
                   </div>
                 </div>
                 <RoleBadge role={u.role} />

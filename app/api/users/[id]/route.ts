@@ -17,7 +17,8 @@ export async function PATCH(
 
   let body: {
     bio?: string;
-    level?: number;
+    username?: string;
+    level?: string | number;
     role?: (typeof ROLES)[number];
     suspended?: boolean;
     banned?: boolean;
@@ -42,12 +43,23 @@ export async function PATCH(
     const values: any[] = [];
 
     if (body.level !== undefined) {
-      const v = Number(body.level);
-      if (!Number.isFinite(v) || v < 1) {
-        return NextResponse.json({ error: "Invalid level." }, { status: 400 });
+      const raw = String(body.level).trim();
+      const isPlainInt = /^\d+$/.test(raw);
+      if (isPlainInt) {
+        const v = Number(raw);
+        if (!Number.isFinite(v) || v < 1) {
+          return NextResponse.json({ error: "Invalid level." }, { status: 400 });
+        }
+        values.push(v);
+        sets.push(`level = $${values.length}`);
+        sets.push(`level_label = null`);
+      } else {
+        if (!raw) {
+          return NextResponse.json({ error: "Level can't be empty." }, { status: 400 });
+        }
+        values.push(raw.slice(0, 40));
+        sets.push(`level_label = $${values.length}`);
       }
-      values.push(v);
-      sets.push(`level = $${values.length}`);
     }
     if (body.role !== undefined) {
       if (!ROLES.includes(body.role)) {
@@ -78,26 +90,59 @@ export async function PATCH(
     values.push(id);
     const rows = await query(
       `update users set ${sets.join(", ")} where id = $${values.length}
-       returning id, username, role, level, suspended, banned`,
+       returning id, username, role, level, level_label, suspended, banned`,
       values
     );
     if (!rows[0]) return NextResponse.json({ error: "User not found." }, { status: 404 });
     return NextResponse.json({ user: rows[0] });
   }
 
-  // Self bio edit
+  // Self profile edit (bio and/or username)
   const guarded = await requireUser();
   if ("error" in guarded) return guarded.error;
   if (guarded.user.id !== id) {
     return NextResponse.json({ error: "You can only edit your own profile." }, { status: 403 });
   }
 
-  const bio = (body.bio ?? "").slice(0, 300);
-  const rows = await query(
-    `update users set bio = $1 where id = $2 returning id, username, bio`,
-    [bio, id]
-  );
-  return NextResponse.json({ user: rows[0] });
+  const selfSets: string[] = [];
+  const selfValues: any[] = [];
+
+  if (body.bio !== undefined) {
+    selfValues.push(body.bio.slice(0, 300));
+    selfSets.push(`bio = $${selfValues.length}`);
+  }
+
+  if (body.username !== undefined) {
+    const uname = body.username.trim();
+    const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
+    if (!USERNAME_RE.test(uname)) {
+      return NextResponse.json(
+        { error: "Username must be 3-20 characters, letters/numbers/underscore only." },
+        { status: 400 }
+      );
+    }
+    selfValues.push(uname);
+    selfSets.push(`username = $${selfValues.length}`);
+  }
+
+  if (!selfSets.length) {
+    return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
+  }
+
+  selfValues.push(id);
+  try {
+    const rows = await query(
+      `update users set ${selfSets.join(", ")} where id = $${selfValues.length}
+       returning id, username, bio`,
+      selfValues
+    );
+    return NextResponse.json({ user: rows[0] });
+  } catch (err: any) {
+    if (err?.code === "23505") {
+      return NextResponse.json({ error: "That username is already taken." }, { status: 409 });
+    }
+    throw err;
+  }
 }
 
 export async function DELETE(

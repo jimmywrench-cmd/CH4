@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import { useAuth, isAdmin } from "@/lib/client/AuthContext";
 import { useToast } from "../Toast";
-import { Rank, rankForLevel, rankBounds } from "@/lib/ranks";
+import { Rank, rankForLevel, rankBounds, displayRankName } from "@/lib/ranks";
 import RoleBadge from "../RoleBadge";
 
 type DashTab = "review" | "users" | "analytics" | "announce" | "ranks";
 
 const ROLE_CYCLE = ["Member", "Verified", "Moderator", "Admin", "Owner"];
+const ROLE_DISPLAY: Record<string, string> = { Admin: "Co-Owner" };
+const roleLabel = (r: string) => ROLE_DISPLAY[r] ?? r;
 
 export default function DashboardView({
   ranks,
@@ -69,14 +71,17 @@ export default function DashboardView({
     loadQueue();
   }
 
-  async function bumpLevel(u: any) {
+  async function setLevel(u: any, value: string) {
+    const raw = value.trim();
+    const current = u.level_label ?? String(u.level);
+    if (!raw || raw === current) return;
     const res = await fetch(`/api/users/${u.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ level: u.level + 1 }),
+      body: JSON.stringify({ level: raw }),
     });
     if (!res.ok) return toast((await res.json()).error || "Could not update.");
-    toast(`${u.username} bumped to level ${u.level + 1}`);
+    toast(`${u.username} is now "${raw}"`);
     loadUsers();
   }
   async function cycleRole(u: any) {
@@ -88,7 +93,7 @@ export default function DashboardView({
     });
     const data = await res.json();
     if (!res.ok) return toast(data.error || "Could not update role.");
-    toast(`${u.username} is now ${next}`);
+    toast(`${u.username} is now ${roleLabel(next)}`);
     loadUsers();
   }
   async function toggleSuspend(u: any) {
@@ -101,14 +106,14 @@ export default function DashboardView({
     toast(`${u.username} ${u.suspended ? "unsuspended" : "suspended"}.`);
     loadUsers();
   }
-  async function banUser(u: any) {
+  async function toggleBan(u: any) {
     const res = await fetch(`/api/users/${u.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ banned: true }),
+      body: JSON.stringify({ banned: !u.banned }),
     });
-    if (!res.ok) return toast("Could not ban.");
-    toast(`${u.username} has been banned.`);
+    if (!res.ok) return toast("Could not update ban status.");
+    toast(`${u.username} has been ${u.banned ? "unbanned" : "banned"}.`);
     loadUsers();
   }
   async function deleteUser(u: any) {
@@ -141,6 +146,30 @@ export default function DashboardView({
       body: JSON.stringify({ min_level: v }),
     });
     if (!res.ok) return toast("Could not update rank.");
+    reloadRanks();
+  }
+  async function editRankName(id: string, value: string, current: string) {
+    const v = value.trim();
+    if (!v || v === current) return;
+    const res = await fetch(`/api/ranks/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: v }),
+    });
+    if (!res.ok) return toast("Could not rename rank.");
+    toast(`Rank renamed to "${v}"`);
+    reloadRanks();
+  }
+  async function editRankMax(id: string, value: string) {
+    const v = value.trim();
+    const payload = v === "" || v === "∞" ? { max_level: null } : { max_level: parseInt(v, 10) };
+    if (payload.max_level !== null && !Number.isFinite(payload.max_level)) return;
+    const res = await fetch(`/api/ranks/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return toast((await res.json()).error || "Could not update max level.");
     reloadRanks();
   }
   async function addRank() {
@@ -238,7 +267,22 @@ export default function DashboardView({
                   </div>
                   <span className="muted small">{new Date(s.created_at).toLocaleDateString()}</span>
                 </div>
-                <div className="review-thumb">▶ clip preview</div>
+                {s.video_url ? (
+                  <video
+                    src={s.video_url}
+                    controls
+                    preload="metadata"
+                    style={{
+                      width: "100%",
+                      maxHeight: 320,
+                      borderRadius: 12,
+                      background: "#000",
+                      display: "block",
+                    }}
+                  />
+                ) : (
+                  <div className="review-thumb">No clip attached.</div>
+                )}
                 <div className="flex gap10">
                   <button className="btn btn-success btn-sm" onClick={() => approve(s.id)}>
                     ✅ Approve
@@ -289,23 +333,42 @@ export default function DashboardView({
                   <td>
                     <RoleBadge role={u.role} />
                   </td>
-                  <td className="mono">{u.level}</td>
-                  <td>{rankForLevel(ranks, u.level).name}</td>
+                  <td className="mono">
+                    {admin ? (
+                      <input
+                        type="text"
+                        defaultValue={u.level_label ?? u.level}
+                        className="mono"
+                        style={{
+                          width: 72,
+                          background: "rgba(255,255,255,.05)",
+                          border: "1px solid var(--border)",
+                          borderRadius: 8,
+                          padding: "5px 8px",
+                          color: "var(--text)",
+                        }}
+                        onBlur={(e) => setLevel(u, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                        }}
+                      />
+                    ) : (
+                      u.level_label ?? u.level
+                    )}
+                  </td>
+                  <td>{displayRankName(ranks, u)}</td>
                   <td className="mono">{u.approved_count}</td>
                   {admin && (
                     <td>
                       <div className="flex gap8" style={{ flexWrap: "wrap" }}>
-                        <button className="btn btn-ghost btn-sm" onClick={() => bumpLevel(u)}>
-                          +1 Lvl
-                        </button>
                         <button className="btn btn-ghost btn-sm" onClick={() => cycleRole(u)}>
                           Role
                         </button>
                         <button className="btn btn-ghost btn-sm" onClick={() => toggleSuspend(u)}>
                           {u.suspended ? "Unsuspend" : "Suspend"}
                         </button>
-                        <button className="btn btn-danger btn-sm" onClick={() => banUser(u)}>
-                          Ban
+                        <button className="btn btn-danger btn-sm" onClick={() => toggleBan(u)}>
+                          {u.banned ? "Unban" : "Ban"}
                         </button>
                         <button className="btn btn-danger btn-sm" onClick={() => deleteUser(u)}>
                           Delete
@@ -406,9 +469,27 @@ export default function DashboardView({
                   <th>Max Level</th>
                   <th></th>
                 </tr>
-                {bounds.map((r) => (
+                {bounds.map((r, i) => (
                   <tr key={r.id}>
-                    <td style={{ fontWeight: 600 }}>{r.name}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      <input
+                        type="text"
+                        defaultValue={r.name}
+                        style={{
+                          width: 140,
+                          background: "rgba(255,255,255,.05)",
+                          border: "1px solid var(--border)",
+                          borderRadius: 8,
+                          padding: "5px 8px",
+                          color: "var(--text)",
+                          fontWeight: 600,
+                        }}
+                        onBlur={(e) => editRankName(r.id, e.target.value, r.name)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                        }}
+                      />
+                    </td>
                     <td>
                       <input
                         type="text"
@@ -425,7 +506,29 @@ export default function DashboardView({
                         onBlur={(e) => editRankMin(r.id, e.target.value)}
                       />
                     </td>
-                    <td className="mono muted">{r.max_level === Infinity ? "∞" : r.max_level}</td>
+                    <td className="mono muted">
+                      {i === bounds.length - 1 ? (
+                        <input
+                          type="text"
+                          defaultValue={r.max_level === Infinity ? "" : r.max_level}
+                          placeholder="∞"
+                          className="mono"
+                          style={{
+                            width: 60,
+                            background: "rgba(255,255,255,.05)",
+                            border: "1px solid var(--border)",
+                            borderRadius: 8,
+                            padding: "5px 8px",
+                            color: "var(--text)",
+                          }}
+                          onBlur={(e) => editRankMax(r.id, e.target.value)}
+                        />
+                      ) : r.max_level === Infinity ? (
+                        "∞"
+                      ) : (
+                        r.max_level
+                      )}
+                    </td>
                     <td>
                       <button className="btn btn-ghost btn-sm" onClick={() => removeRank(r.id)}>
                         Remove

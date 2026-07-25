@@ -10,8 +10,6 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [player, setPlayer] = useState("");
-  const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploadPct, setUploadPct] = useState(0);
@@ -25,7 +23,7 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
   if (!user) return null;
 
   const rank = rankForLevel(ranks, user.level);
-  const ready = !!(player.trim() && title.trim() && desc.trim() && videoPath && !submitting);
+  const ready = !!(videoPath && !submitting);
   const durationSec = (((trimEnd - trimStart) / 100) * 30).toFixed(1); // assumes ~30s source, visual only
 
   async function handleFile(f: File) {
@@ -67,15 +65,15 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
   }
 
   async function submitClip() {
-    if (!ready) return;
+    if (!ready || !user) return;
     setSubmitting(true);
     try {
       const res = await fetch("/api/submissions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: title.trim(),
-          description: `Player: ${player.trim()}\n\n${desc.trim()}`,
+          title: `${user.username}'s clip — ${new Date().toLocaleDateString()}`,
+          description: [`Player: ${user.username}`, desc.trim()].filter(Boolean).join("\n\n"),
           video_path: videoPath,
         }),
       });
@@ -85,8 +83,6 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
         return;
       }
       toast("Submitted for review.");
-      setPlayer("");
-      setTitle("");
       setDesc("");
       setFile(null);
       setVideoPath(null);
@@ -108,39 +104,25 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
       <div className="grid2">
         <div className="card" style={{ padding: 26 }}>
           <div className="field">
-            <label>Player&apos;s Name *</label>
-            <input
-              type="text"
-              value={player}
-              onChange={(e) => setPlayer(e.target.value)}
-              placeholder="e.g. Ossie"
-            />
+            <label>Player&apos;s Name</label>
+            <div className="field-locked">🔒 {user.username}</div>
           </div>
           <div className="field">
-            <label>Video Title *</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Clutch 1v3 on Warehouse"
-            />
-          </div>
-          <div className="field">
-            <label>Short Description *</label>
+            <label>Short Description</label>
             <textarea
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
-              placeholder="What happens in the clip?"
+              placeholder="What happens in the clip? (optional)"
             />
           </div>
           <div className="grid3" style={{ gridTemplateColumns: "1fr 1fr" }}>
             <div className="field">
               <label>Current Level</label>
-              <div className="field-locked">🔒 Level {user.level}</div>
+              <div className="field-locked">🔒 {user.level_label ?? `Level ${user.level}`}</div>
             </div>
             <div className="field">
               <label>Current Rank</label>
-              <div className="field-locked">🔒 {rank.name}</div>
+              <div className="field-locked">🔒 {user.level_label ? "—" : rank.name}</div>
             </div>
           </div>
 

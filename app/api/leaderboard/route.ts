@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const orderBy = SORTS[tab] || SORTS.level;
 
   const rows = await query(
-    `select id, username, role, level, approved_count, rejected_count, last_seen, created_at
+    `select id, username, role, level, level_label, approved_count, rejected_count, last_seen, created_at
      from users
      where not banned
      order by ${orderBy}

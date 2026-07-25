@@ -25,6 +25,7 @@ create table if not exists public.users (
   role          text not null default 'Member'
                   check (role in ('Member','Verified','Moderator','Admin','Owner')),
   level         int  not null default 1 check (level >= 1),
+  level_label   text,
   bio           text not null default '',
   avatar_seed   text not null default '',
   approved_count int not null default 0,
@@ -46,6 +47,7 @@ create table if not exists public.ranks (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
   min_level   int  not null,
+  max_level_override int,
   sort_order  int  not null,
   created_at  timestamptz not null default now()
 );
@@ -183,6 +185,7 @@ as $$
 declare
   v_user_id uuid;
   v_status text;
+  v_suspended boolean;
 begin
   select user_id, status into v_user_id, v_status
   from public.submissions where id = p_submission_id
@@ -199,12 +202,21 @@ begin
     set status = 'approved', reviewed_at = now(), reviewed_by = p_reviewer_id
     where id = p_submission_id;
 
-  update public.users
-    set level = level + 1, approved_count = approved_count + 1
-    where id = v_user_id;
+  select suspended into v_suspended from public.users where id = v_user_id;
 
-  insert into public.notifications (user_id, text)
-    values (v_user_id, 'Your submission was approved and you leveled up!');
+  if v_suspended then
+    update public.users
+      set approved_count = approved_count + 1
+      where id = v_user_id;
+    insert into public.notifications (user_id, text)
+      values (v_user_id, 'Your submission was approved (no level gained while suspended).');
+  else
+    update public.users
+      set level = level + 1, approved_count = approved_count + 1
+      where id = v_user_id;
+    insert into public.notifications (user_id, text)
+      values (v_user_id, 'Your submission was approved and you leveled up!');
+  end if;
 end;
 $$;
 

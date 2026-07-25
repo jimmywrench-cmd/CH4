@@ -7,7 +7,7 @@ export async function GET() {
   if ("error" in guarded) return guarded.error;
 
   const rows = await query(
-    `select id, username, role, level, approved_count, rejected_count,
+    `select id, username, role, level, level_label, approved_count, rejected_count,
             suspended, banned, created_at
      from users
      order by created_at asc`

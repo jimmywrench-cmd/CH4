@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useAuth, isAdmin, isStaff } from "@/lib/client/AuthContext";
+import { useAuth, isStaff } from "@/lib/client/AuthContext";
 import { useToast } from "../Toast";
 import RoleBadge from "../RoleBadge";
 
@@ -12,21 +12,7 @@ export default function ChatView() {
   const [input, setInput] = useState("");
   const [replyTo, setReplyTo] = useState<any | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
-  const [showEmoji, setShowEmoji] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const emojiRef = useRef<HTMLDivElement>(null);
-
-  const EMOJIS = ["😀","😂","🔥","💯","👍","👎","😮","😢","🎉","❤️","😎","🤔","👏","😭","🙌","💀"];
-
-  useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (emojiRef.current && !emojiRef.current.contains(e.target as Node)) {
-        setShowEmoji(false);
-      }
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, []);
 
   async function load() {
     const res = await fetch("/api/chat");
@@ -73,14 +59,6 @@ export default function ChatView() {
     else toast("Could not delete message.");
   }
 
-  async function togglePin(id: number) {
-    const res = await fetch(`/api/chat/${id}/pin`, { method: "POST" });
-    if (res.ok) load();
-    else toast("Could not pin message.");
-  }
-
-  const pinned = messages.find((m) => m.pinned);
-
   return (
     <div>
       <div className="section-title">
@@ -89,11 +67,6 @@ export default function ChatView() {
       </div>
       <div className="chat-wrap">
         <div className="card chat-panel">
-          {pinned && (
-            <div className="chat-pin">
-              📌 <span>{pinned.text}</span>
-            </div>
-          )}
           <div className="chat-head">
             <span className="online-status" />
             <span className="small" style={{ fontWeight: 600 }}>
@@ -104,7 +77,6 @@ export default function ChatView() {
           <div className="chat-msgs">
             {messages.map((m) => {
               const canDelete = m.user_id === user.id || isStaff(user.role);
-              const canPin = isAdmin(user.role);
               return (
                 <div className="msg" key={m.id}>
                   <div className="avatar" style={{ width: 32, height: 32, fontSize: 11 }}>
@@ -120,7 +92,8 @@ export default function ChatView() {
                       <span className="msg-name">{m.username}</span>
                       <RoleBadge role={m.role} />
                       <span className="msg-meta">
-                        Level {m.level} · {new Date(m.created_at).toLocaleTimeString()}
+                        {m.level_label ?? `Level ${m.level}`} ·{" "}
+                        {new Date(m.created_at).toLocaleTimeString()}
                       </span>
                     </div>
                     <div className="msg-text">{m.text}</div>
@@ -133,15 +106,6 @@ export default function ChatView() {
                     >
                       ↩
                     </button>
-                    {canPin && (
-                      <button
-                        className="msg-act-btn"
-                        title="Pin"
-                        onClick={() => togglePin(m.id)}
-                      >
-                        📌
-                      </button>
-                    )}
                     {canDelete && (
                       <button
                         className="msg-act-btn"
@@ -163,53 +127,7 @@ export default function ChatView() {
               <button onClick={() => setReplyTo(null)}>✕</button>
             </div>
           )}
-          <div className="chat-input-wrap" style={{ position: "relative" }} ref={emojiRef}>
-            <button
-              className="icon-btn"
-              title="Emoji"
-              onClick={() => setShowEmoji((s) => !s)}
-            >
-              🙂
-            </button>
-            {showEmoji && (
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "calc(100% + 8px)",
-                  left: 0,
-                  background: "var(--bg3)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 12,
-                  padding: 8,
-                  display: "grid",
-                  gridTemplateColumns: "repeat(8, 1fr)",
-                  gap: 4,
-                  boxShadow: "0 8px 30px rgba(0,0,0,.5)",
-                  zIndex: 20,
-                }}
-              >
-                {EMOJIS.map((em) => (
-                  <button
-                    key={em}
-                    onClick={() => {
-                      setInput((v) => v + em);
-                      setShowEmoji(false);
-                    }}
-                    style={{
-                      background: "none",
-                      fontSize: 18,
-                      padding: 4,
-                      borderRadius: 6,
-                      cursor: "pointer",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--glass)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
-                  >
-                    {em}
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="chat-input-wrap">
             <input
               placeholder="Message #global"
               value={input}
