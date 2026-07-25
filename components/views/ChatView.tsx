@@ -12,7 +12,21 @@ export default function ChatView() {
   const [input, setInput] = useState("");
   const [replyTo, setReplyTo] = useState<any | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
+  const [showEmoji, setShowEmoji] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const emojiRef = useRef<HTMLDivElement>(null);
+
+  const EMOJIS = ["😀","😂","🔥","💯","👍","👎","😮","😢","🎉","❤️","😎","🤔","👏","😭","🙌","💀"];
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (emojiRef.current && !emojiRef.current.contains(e.target as Node)) {
+        setShowEmoji(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
 
   async function load() {
     const res = await fetch("/api/chat");
@@ -149,10 +163,53 @@ export default function ChatView() {
               <button onClick={() => setReplyTo(null)}>✕</button>
             </div>
           )}
-          <div className="chat-input-wrap">
-            <button className="icon-btn" title="Emoji">
+          <div className="chat-input-wrap" style={{ position: "relative" }} ref={emojiRef}>
+            <button
+              className="icon-btn"
+              title="Emoji"
+              onClick={() => setShowEmoji((s) => !s)}
+            >
               🙂
             </button>
+            {showEmoji && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: "calc(100% + 8px)",
+                  left: 0,
+                  background: "var(--bg3)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 12,
+                  padding: 8,
+                  display: "grid",
+                  gridTemplateColumns: "repeat(8, 1fr)",
+                  gap: 4,
+                  boxShadow: "0 8px 30px rgba(0,0,0,.5)",
+                  zIndex: 20,
+                }}
+              >
+                {EMOJIS.map((em) => (
+                  <button
+                    key={em}
+                    onClick={() => {
+                      setInput((v) => v + em);
+                      setShowEmoji(false);
+                    }}
+                    style={{
+                      background: "none",
+                      fontSize: 18,
+                      padding: 4,
+                      borderRadius: 6,
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--glass)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+                  >
+                    {em}
+                  </button>
+                ))}
+              </div>
+            )}
             <input
               placeholder="Message #global"
               value={input}
