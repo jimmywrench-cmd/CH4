@@ -3,11 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth, isAdmin, isStaff } from "@/lib/client/AuthContext";
 import { useRanks } from "@/lib/client/useRanks";
+import { useAnnouncements } from "@/lib/client/useAnnouncements";
+import { playNotifBlip, playAnnouncementChime } from "@/lib/client/sound";
+import { useToast } from "./Toast";
 import RoleBadge from "./RoleBadge";
 import HomeView from "./views/HomeView";
 import SubmitView from "./views/SubmitView";
 import LeaderboardView from "./views/LeaderboardView";
 import ChatView from "./views/ChatView";
+import AnnouncementsView from "./views/AnnouncementsView";
 import ProfileView from "./views/ProfileView";
 import DashboardView from "./views/DashboardView";
 import SearchView from "./views/SearchView";
@@ -17,6 +21,7 @@ export type ViewName =
   | "submit"
   | "leaderboard"
   | "chat"
+  | "announcements"
   | "profile"
   | "dashboard"
   | "search";
@@ -62,6 +67,15 @@ const NAV: { view: ViewName; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    view: "announcements",
+    label: "Announcements",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+        <path d="M3 11l18-7-7 18-2-8-8-2z" />
+      </svg>
+    ),
+  },
+  {
     view: "profile",
     label: "My Profile",
     icon: (
@@ -75,20 +89,45 @@ const NAV: { view: ViewName; label: string; icon: React.ReactNode }[] = [
 
 export default function AppShell() {
   const { user, logout } = useAuth();
+  const { toast } = useToast();
   const { ranks, reload: reloadRanks } = useRanks();
   const [view, setView] = useState<ViewName>("home");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState<any[]>([]);
   const [search, setSearch] = useState("");
+  const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
   const notifRef = useRef<HTMLDivElement>(null);
+  const seenNotifIds = useRef<Set<number> | null>(null);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+
+  useAnnouncements((a) => {
+    playAnnouncementChime();
+    toast(`📢 New announcement: ${a.title}`);
+    if (viewRef.current !== "announcements") {
+      setUnreadAnnouncements((n) => n + 1);
+    }
+  });
 
   if (!user) return null;
 
   async function loadNotifs() {
     const res = await fetch("/api/notifications");
     const data = await res.json();
-    setNotifs(data.notifications ?? []);
+    const list = data.notifications ?? [];
+
+    if (seenNotifIds.current === null) {
+      // First load after mount: just record what exists, don't chime for history.
+      seenNotifIds.current = new Set(list.map((n: any) => n.id));
+    } else {
+      const fresh = list.filter((n: any) => !seenNotifIds.current!.has(n.id));
+      if (fresh.length > 0) {
+        playNotifBlip();
+        fresh.forEach((n: any) => seenNotifIds.current!.add(n.id));
+      }
+    }
+    setNotifs(list);
   }
 
   useEffect(() => {
@@ -110,6 +149,7 @@ export default function AppShell() {
   function go(v: ViewName) {
     setView(v);
     setSidebarOpen(false);
+    if (v === "announcements") setUnreadAnnouncements(0);
   }
 
   const unreadCount = notifs.filter((n) => !n.read).length;
@@ -135,6 +175,9 @@ export default function AppShell() {
             >
               {n.icon}
               {n.label}
+              {n.view === "announcements" && unreadAnnouncements > 0 && (
+                <span className="nav-badge">{unreadAnnouncements}</span>
+              )}
             </button>
           ))}
         </div>
@@ -284,6 +327,7 @@ export default function AppShell() {
           {view === "submit" && <SubmitView ranks={ranks} />}
           {view === "leaderboard" && <LeaderboardView ranks={ranks} />}
           {view === "chat" && <ChatView />}
+          {view === "announcements" && <AnnouncementsView />}
           {view === "profile" && <ProfileView ranks={ranks} />}
           {view === "dashboard" && isStaff(user.role) && (
             <DashboardView ranks={ranks} reloadRanks={reloadRanks} />

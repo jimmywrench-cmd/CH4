@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import StarField from "@/components/StarField";
 
 export const metadata: Metadata = {
   title: "CH4 — Channel4",
@@ -16,7 +17,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <StarField />
+        {children}
+      </body>
     </html>
   );
 }

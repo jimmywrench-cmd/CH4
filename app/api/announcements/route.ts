@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdmin } from "@/lib/guard";
+import { requireStaff } from "@/lib/guard";
 
 export async function GET() {
   const rows = await query(
@@ -15,7 +15,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const guarded = await requireAdmin();
+  const guarded = await requireStaff();
   if ("error" in guarded) return guarded.error;
 
   let body: { title?: string; body?: string };
@@ -35,6 +35,13 @@ export async function POST(req: NextRequest) {
     `insert into announcements (title, body, posted_by) values ($1, $2, $3)
      returning id, title, body, created_at`,
     [title, text, guarded.user.id]
+  );
+
+  // Fan out a notification to every user so the bell + chime fire for them.
+  await query(
+    `insert into notifications (user_id, text)
+     select id, $1 from users`,
+    [`📢 New announcement: ${title}`]
   );
 
   return NextResponse.json({ announcement: rows[0] });
