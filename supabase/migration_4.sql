@@ -39,7 +39,7 @@ create index if not exists status_permissions_status_idx
 --    customized.
 -- ------------------------------------------------------------
 insert into public.status_permissions (status, permission, enabled)
-select s.status, p.permission, p.default_enabled
+select s.status, perm.permission, p.default_enabled
 from (values
   ('Owner'), ('Co-Owner'), ('Admin'), ('Moderator'), ('Helper'), ('Verified'), ('Member')
 ) as s(status)
