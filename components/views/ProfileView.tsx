@@ -6,11 +6,13 @@ import { useToast } from "../Toast";
 import { Rank, rankForLevel, nextLevelInfo } from "@/lib/ranks";
 import RoleBadge from "../RoleBadge";
 import Insignia from "../Insignia";
+import CustomRoleBadge, { CustomRole } from "../CustomRoleBadge";
 
 export default function ProfileView({ ranks }: { ranks: Rank[] }) {
   const { user, refresh } = useAuth();
   const { toast } = useToast();
   const [activity, setActivity] = useState<any[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
   const [editing, setEditing] = useState(false);
   const [bio, setBio] = useState(user?.bio ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
@@ -21,6 +23,9 @@ export default function ProfileView({ ranks }: { ranks: Rank[] }) {
     fetch(`/api/submissions?mine=1`)
       .then((r) => r.json())
       .then((d) => setActivity(d.submissions ?? []));
+    fetch(`/api/users/${user.id}/roles`)
+      .then((r) => r.json())
+      .then((d) => setCustomRoles(d.roles ?? []));
   }, [user?.id]);
 
   useEffect(() => {
@@ -90,7 +95,7 @@ export default function ProfileView({ ranks }: { ranks: Rank[] }) {
                 <span>{user.level_label}</span>
               ) : (
                 <>
-                  <span>{rank.name}</span>
+                  <span>Rank: {rank.name}</span>
                   <span>·</span>
                   <span>Level {user.level}</span>
                 </>
@@ -98,6 +103,14 @@ export default function ProfileView({ ranks }: { ranks: Rank[] }) {
               <span>·</span>
               <span>Joined {new Date(user.created_at).toLocaleDateString()}</span>
             </div>
+            {customRoles.length > 0 && (
+              <div className="flex gap8 mb14" style={{ flexWrap: "wrap", alignItems: "center" }}>
+                <span className="muted small">Roles:</span>
+                {customRoles.map((r) => (
+                  <CustomRoleBadge key={r.id} role={r} />
+                ))}
+              </div>
+            )}
             {!user.level_label && (
               <div style={{ maxWidth: 420 }}>
                 <div className="flex" style={{ justifyContent: "space-between", marginBottom: 6 }}>

@@ -26,7 +26,20 @@ export async function GET(
   const messages = await query(
     `select m.id, m.text, m.reply_to_id, m.created_at,
             u.id as user_id, u.username, u.role, u.level, u.level_label,
-            r.id as reply_user_id, r.username as reply_username, rm.text as reply_text
+            r.id as reply_user_id, r.username as reply_username, rm.text as reply_text,
+            coalesce(
+              (select json_agg(
+                 json_build_object(
+                   'id', cr.id, 'name', cr.name, 'color', cr.color, 'bold', cr.bold,
+                   'italic', cr.italic, 'underline', cr.underline,
+                   'strikethrough', cr.strikethrough, 'icon', cr.icon
+                 ) order by cr.sort_order
+               )
+               from user_custom_roles ucr
+               join custom_roles cr on cr.id = ucr.role_id
+               where ucr.user_id = u.id),
+              '[]'::json
+            ) as custom_roles
      from dm_messages m
      join users u on u.id = m.user_id
      left join dm_messages rm on rm.id = m.reply_to_id and not rm.deleted
@@ -38,7 +51,20 @@ export async function GET(
   );
 
   const members = await query(
-    `select u.id, u.username, u.role
+    `select u.id, u.username, u.role,
+            coalesce(
+              (select json_agg(
+                 json_build_object(
+                   'id', cr.id, 'name', cr.name, 'color', cr.color, 'bold', cr.bold,
+                   'italic', cr.italic, 'underline', cr.underline,
+                   'strikethrough', cr.strikethrough, 'icon', cr.icon
+                 ) order by cr.sort_order
+               )
+               from user_custom_roles ucr
+               join custom_roles cr on cr.id = ucr.role_id
+               where ucr.user_id = u.id),
+              '[]'::json
+            ) as custom_roles
      from dm_group_members gm join users u on u.id = gm.user_id
      where gm.dm_group_id = $1
      order by u.username`,

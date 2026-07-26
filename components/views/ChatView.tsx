@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth, isStaff } from "@/lib/client/AuthContext";
 import { useToast } from "../Toast";
 import RoleBadge from "../RoleBadge";
+import CustomRoleBadge, { CustomRole } from "../CustomRoleBadge";
 import NewGroupModal from "../NewGroupModal";
 import NewRoomModal from "../NewRoomModal";
 
@@ -208,6 +209,9 @@ export default function ChatView() {
                     <div className="msg-top">
                       <span className="msg-name">{m.username}</span>
                       <RoleBadge role={m.role} />
+                      {(m.custom_roles ?? []).map((r: CustomRole) => (
+                        <CustomRoleBadge key={r.id} role={r} size="sm" />
+                      ))}
                       <span className="msg-meta">
                         {m.level_label ?? `Level ${m.level}`} ·{" "}
                         {new Date(m.created_at).toLocaleTimeString()}
