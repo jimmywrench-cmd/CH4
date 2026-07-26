@@ -34,6 +34,7 @@ export default function DashboardView({
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
   const [showRoleManager, setShowRoleManager] = useState(false);
   const [assignPickerFor, setAssignPickerFor] = useState<string | null>(null);
+  const [createRoleFor, setCreateRoleFor] = useState<string | null>(null);
 
   async function loadQueue() {
     const res = await fetch("/api/submissions?status=pending");
@@ -71,12 +72,6 @@ export default function DashboardView({
     const res = await fetch(`/api/users/${userId}/roles/${roleId}`, { method: "DELETE" });
     if (!res.ok) return toast("Could not remove role.");
     loadUsers();
-  }
-  async function quickAssign(userId: string, roleName: string) {
-    const role = customRoles.find((r) => r.name === roleName);
-    if (!role) return toast(`"${roleName}" role not found.`);
-    await assignRole(userId, role.id);
-    toast(`${roleName} assigned.`);
   }
 
   const tabs: DashTab[] = admin
@@ -461,6 +456,17 @@ export default function DashboardView({
                         {customRoles.length === 0 && (
                           <span className="muted small">No custom roles yet.</span>
                         )}
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          style={{ justifyContent: "flex-start", borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 2 }}
+                          onClick={() => {
+                            setAssignPickerFor(null);
+                            setCreateRoleFor(u.id);
+                            setShowRoleManager(true);
+                          }}
+                        >
+                          + Custom Role
+                        </button>
                       </div>
                     )}
                   </td>
@@ -470,18 +476,6 @@ export default function DashboardView({
                       <div className="flex gap8" style={{ flexWrap: "wrap" }}>
                         <button className="btn btn-ghost btn-sm" onClick={() => cycleRole(u)}>
                           Status
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => quickAssign(u.id, "Beta Tester")}
-                        >
-                          + Beta Tester
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => quickAssign(u.id, "Early Access")}
-                        >
-                          + Early Access
                         </button>
                         <button className="btn btn-ghost btn-sm" onClick={() => toggleSuspend(u)}>
                           {u.suspended ? "Unsuspend" : "Suspend"}
@@ -506,7 +500,14 @@ export default function DashboardView({
       {showRoleManager && (
         <CustomRoleManager
           roles={customRoles}
-          onClose={() => setShowRoleManager(false)}
+          startInCreate={!!createRoleFor}
+          onClose={() => {
+            setShowRoleManager(false);
+            if (createRoleFor) {
+              setAssignPickerFor(createRoleFor);
+              setCreateRoleFor(null);
+            }
+          }}
           onChanged={() => {
             loadCustomRoles();
             loadUsers();

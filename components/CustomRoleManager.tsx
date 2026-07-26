@@ -23,13 +23,15 @@ export default function CustomRoleManager({
   roles,
   onClose,
   onChanged,
+  startInCreate,
 }: {
   roles: CustomRole[];
   onClose: () => void;
   onChanged: () => void;
+  startInCreate?: boolean;
 }) {
   const { toast } = useToast();
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(startInCreate ? "new" : null);
   const [draft, setDraft] = useState(emptyDraft);
   const [saving, setSaving] = useState(false);
 
