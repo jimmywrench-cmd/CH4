@@ -17,13 +17,12 @@ export type SessionUser = {
   suspended: boolean;
   banned: boolean;
   created_at: string;
-  theme?: "light" | "dark" | "system" | null;
 };
 
 type AuthState = {
   user: SessionUser | null;
   loading: boolean;
-  refresh: () => Promise<void>;
+  refresh: (silent?: boolean) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -33,14 +32,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  // `silent` skips the loading flag so background polls don't flash the
+  // full-screen spinner (page.tsx shows a spinner whenever loading=true).
+  const refresh = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch("/api/auth/me");
       const data = await res.json();
       setUser(data.user ?? null);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -51,6 +52,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refresh();
+    // Keep session data (level, role, approved/rejected counts, staff
+    // status, suspended/banned, etc.) live without requiring a manual
+    // page reload — mirrors the polling already used for chat/
+    // announcements/notifications elsewhere in the app. Silent so it
+    // doesn't interrupt whatever the user is doing.
+    const id = setInterval(() => refresh(true), 20000);
+    return () => clearInterval(id);
   }, [refresh]);
 
   return (
