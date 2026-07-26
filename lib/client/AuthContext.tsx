@@ -17,6 +17,7 @@ export type SessionUser = {
   suspended: boolean;
   banned: boolean;
   created_at: string;
+  theme?: "light" | "dark" | "system" | null;
 };
 
 type AuthState = {
