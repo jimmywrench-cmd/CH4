@@ -73,15 +73,28 @@ export default function HomeView({
 
       <div className="grid2">
         <div>
-          <div className="section-title">
-            <span className="accent-bar" />
-            Latest Announcements
+          <div
+            className="flex"
+            style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}
+          >
+            <div className="section-title" style={{ marginBottom: 0 }}>
+              <span className="accent-bar" />
+              Latest Announcements
+            </div>
+            {announcements.length > 0 && (
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => go("announcements")}
+              >
+                View All
+              </button>
+            )}
           </div>
           <div className="card mb18" style={{ padding: 16 }}>
             {announcements.length === 0 ? (
               <div className="empty-state small">No announcements yet.</div>
             ) : (
-              announcements.map((a) => (
+              announcements.slice(0, 3).map((a) => (
                 <div key={a.id} className="activity-item">
                   <div style={{ width: "100%" }}>
                     <div style={{ fontWeight: 700, fontSize: 13.5 }}>{a.title}</div>

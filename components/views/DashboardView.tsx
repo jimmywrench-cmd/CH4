@@ -101,6 +101,7 @@ export default function DashboardView({
     loadUsers();
   }
   async function deleteSub(id: number) {
+    if (!window.confirm("Delete this submission? This can't be undone.")) return;
     const res = await fetch(`/api/submissions/${id}`, { method: "DELETE" });
     if (!res.ok) return toast("Could not delete.");
     toast("Submission deleted.");
@@ -153,6 +154,7 @@ export default function DashboardView({
     loadUsers();
   }
   async function deleteUser(u: any) {
+    if (!window.confirm(`Permanently delete ${u.username}'s account? This can't be undone.`)) return;
     const res = await fetch(`/api/users/${u.id}`, { method: "DELETE" });
     const data = await res.json();
     if (!res.ok) return toast(data.error || "Could not delete.");
@@ -221,6 +223,7 @@ export default function DashboardView({
     reloadRanks();
   }
   async function removeRank(id: string) {
+    if (!window.confirm("Remove this rank tier?")) return;
     const res = await fetch(`/api/ranks/${id}`, { method: "DELETE" });
     const data = await res.json();
     if (!res.ok) return toast(data.error || "Could not remove rank.");
@@ -427,7 +430,7 @@ export default function DashboardView({
                     </div>
                     {assignPickerFor === u.id && (
                       <div
-                        className="card"
+                        className="popover"
                         style={{
                           position: "absolute",
                           zIndex: 20,

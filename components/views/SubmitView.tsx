@@ -10,6 +10,7 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [ruleBreaker, setRuleBreaker] = useState("");
   const [desc, setDesc] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploadPct, setUploadPct] = useState(0);
@@ -73,7 +74,13 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: `${user.username}'s clip — ${new Date().toLocaleDateString()}`,
-          description: [`Player: ${user.username}`, desc.trim()].filter(Boolean).join("\n\n"),
+          description: [
+            `Player: ${user.username}`,
+            ruleBreaker.trim() ? `Rule Breaker: ${ruleBreaker.trim()}` : "",
+            desc.trim(),
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
           video_path: videoPath,
         }),
       });
@@ -84,6 +91,7 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
       }
       toast("Submitted for review.");
       setDesc("");
+      setRuleBreaker("");
       setFile(null);
       setVideoPath(null);
       setTrimStart(22);
@@ -105,7 +113,13 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
         <div className="card" style={{ padding: 26 }}>
           <div className="field">
             <label>Rule Breaker&apos;s Name</label>
-            <div className="field-unlocked"></div>
+            <input
+              type="text"
+              value={ruleBreaker}
+              onChange={(e) => setRuleBreaker(e.target.value)}
+              placeholder="Who broke the rule? (optional)"
+              maxLength={40}
+            />
           </div>
           <div className="field">
             <label>Short Description</label>

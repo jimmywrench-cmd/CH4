@@ -14,3 +14,14 @@ export async function GET() {
 
   return NextResponse.json({ notifications: rows });
 }
+
+export async function PATCH() {
+  const guarded = await requireUser();
+  if ("error" in guarded) return guarded.error;
+
+  await query(`update notifications set read = true where user_id = $1 and read = false`, [
+    guarded.user.id,
+  ]);
+
+  return NextResponse.json({ ok: true });
+}

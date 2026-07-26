@@ -99,6 +99,7 @@ export default function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState<any[]>([]);
+  const [markingAll, setMarkingAll] = useState(false);
   const [search, setSearch] = useState("");
   const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -149,6 +150,17 @@ export default function AppShell() {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
+
+  async function markAllRead() {
+    if (unreadCount === 0) return;
+    setMarkingAll(true);
+    try {
+      await fetch("/api/notifications", { method: "PATCH" });
+      await loadNotifs();
+    } finally {
+      setMarkingAll(false);
+    }
+  }
 
   function go(v: ViewName) {
     setView(v);
@@ -276,52 +288,45 @@ export default function AppShell() {
               </button>
               {notifOpen && (
                 <div
-                  className="card"
-                  style={{
-                    position: "absolute",
-                    top: 48,
-                    right: 0,
-                    width: 320,
-                    zIndex: 150,
-                    padding: 8,
-                  }}
+                  className="popover notif-panel"
+                  style={{ position: "absolute", top: 48, right: 0, zIndex: 150 }}
                 >
-                  <div
-                    style={{
-                      padding: "10px 12px",
-                      fontWeight: 700,
-                      fontSize: 13,
-                      fontFamily: "'Chakra Petch',sans-serif",
-                    }}
-                  >
-                    Notifications
+                  <div className="notif-panel-head">
+                    <div className="notif-panel-title">Notifications</div>
+                    <button
+                      className="notif-panel-markread"
+                      onClick={markAllRead}
+                      disabled={unreadCount === 0 || markingAll}
+                    >
+                      {markingAll ? "Marking…" : "Mark all read"}
+                    </button>
                   </div>
-                  {notifs.length === 0 ? (
-                    <div className="empty-state small">No notifications yet.</div>
-                  ) : (
-                    notifs.map((n) => (
-                      <div
-                        key={n.id}
-                        className="activity-item"
-                        style={{ padding: "10px 12px", cursor: "pointer" }}
-                        onClick={async () => {
-                          if (!n.read) {
-                            await fetch(`/api/notifications/${n.id}`, { method: "PATCH" });
-                            loadNotifs();
-                          }
-                        }}
-                      >
-                        <div>
-                          <div className="small" style={{ opacity: n.read ? 0.55 : 1 }}>
-                            {n.text}
-                          </div>
-                          <div className="muted small">
-                            {new Date(n.created_at).toLocaleString()}
+                  <div className="notif-panel-list">
+                    {notifs.length === 0 ? (
+                      <div className="empty-state small">No notifications yet.</div>
+                    ) : (
+                      notifs.map((n) => (
+                        <div
+                          key={n.id}
+                          className={`notif-item${n.read ? " is-read" : ""}`}
+                          onClick={async () => {
+                            if (!n.read) {
+                              await fetch(`/api/notifications/${n.id}`, { method: "PATCH" });
+                              loadNotifs();
+                            }
+                          }}
+                        >
+                          <span className="notif-item-dot" />
+                          <div style={{ minWidth: 0 }}>
+                            <div className="notif-item-text">{n.text}</div>
+                            <div className="notif-item-time">
+                              {new Date(n.created_at).toLocaleString()}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))
-                  )}
+                      ))
+                    )}
+                  </div>
                 </div>
               )}
             </div>

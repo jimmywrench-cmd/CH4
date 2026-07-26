@@ -208,6 +208,50 @@ button{font-family:inherit; cursor:pointer; border:none;}
 }
 .card:hover{border-color:var(--border-hi);}
 
+/* ---------- solid popover ----------
+   Used for anything that floats OVER other content (notification tray,
+   inline pickers, menus). Unlike .card — which is meant to sit inline in
+   the page and can stay subtly translucent — a floating popover needs to
+   be genuinely opaque, or whatever is scrolling underneath it shows
+   through and it reads as broken. Near-solid background + a real shadow,
+   blur is just for edge polish now, not for the "see-through" effect. */
+.popover{
+  background:linear-gradient(180deg, rgba(20,20,23,.99), rgba(7,7,8,.995));
+  border:1px solid var(--border-hi);
+  border-radius:var(--r-lg);
+  box-shadow:0 24px 60px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.03) inset;
+  backdrop-filter:blur(20px);
+  position:relative;
+  overflow:hidden;
+}
+
+/* notification tray */
+.notif-panel{width:340px; max-height:420px; display:flex; flex-direction:column;}
+.notif-panel-head{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:14px 16px; border-bottom:1px solid var(--border); flex-shrink:0;
+}
+.notif-panel-title{font-weight:700; font-size:13px; font-family:'Chakra Petch',sans-serif; letter-spacing:.3px;}
+.notif-panel-markread{font-size:11px; font-weight:600; color:var(--muted); transition:.15s;}
+.notif-panel-markread:hover{color:var(--text);}
+.notif-panel-markread:disabled{opacity:.35; cursor:not-allowed;}
+.notif-panel-list{overflow-y:auto; flex:1;}
+.notif-item{
+  display:flex; align-items:flex-start; gap:10px; padding:12px 16px; cursor:pointer;
+  border-bottom:1px solid rgba(255,255,255,.05); transition:.12s; position:relative;
+}
+.notif-item:last-child{border-bottom:none;}
+.notif-item:hover{background:rgba(255,255,255,.045);}
+.notif-item-dot{
+  width:7px; height:7px; border-radius:50%; margin-top:5px; flex-shrink:0;
+  background:var(--blue2); box-shadow:0 0 6px var(--blue2);
+}
+.notif-item.is-read .notif-item-dot{background:transparent; box-shadow:none; border:1px solid var(--border-hi);}
+.notif-item-text{font-size:12.5px; line-height:1.45;}
+.notif-item.is-read .notif-item-text{color:var(--muted); font-weight:400;}
+.notif-item:not(.is-read) .notif-item-text{color:var(--text); font-weight:600;}
+.notif-item-time{font-size:10.5px; color:var(--muted2); margin-top:3px;}
+
 /* ---------- hero ---------- */
 .hero{
   border-radius:28px; padding:56px 48px; position:relative; overflow:hidden; margin-bottom:26px;
@@ -434,6 +478,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; hei
   padding:10px 14px; color:var(--text); font-size:13.5px; font-family:inherit; outline:none; resize:vertical; min-height:70px; margin-bottom:10px;
 }
 .announce-form input:focus, .announce-form textarea:focus{border-color:var(--border-hi); box-shadow:0 0 0 3px rgba(255,255,255,.06);}
+.announce-form-foot{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+.announce-char-count{font-size:11px; color:var(--muted2);}
+.announce-char-count.limit{color:var(--yellow);}
+.announce-delete-confirm{display:flex; align-items:center; gap:6px; margin-left:auto;}
+.announce-delete-confirm span{font-size:11px; color:var(--muted);}
 
 /* profile */
 .profile-hero{display:flex; gap:24px; align-items:center; padding:32px; flex-wrap:wrap;}
@@ -534,3 +583,22 @@ tbody tr:hover td{background:rgba(255,255,255,.02);}
 .upload-progress{height:6px; border-radius:999px; background:rgba(255,255,255,.06); overflow:hidden; margin-top:10px;}
 .upload-progress-fill{height:100%; background:linear-gradient(90deg,var(--blue),var(--purple)); transition:width .2s ease;}
 .empty-state{padding:40px 20px; text-align:center; color:var(--muted);}
+
+/* ---------- dashboard polish ---------- */
+.kpi{transition:.18s;}
+.kpi:hover{transform:translateY(-2px);}
+.confirm-inline{display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--muted);}
+
+/* ---------- donate tab ---------- */
+.donate-hero{padding:40px 36px; text-align:center; max-width:560px; margin:0 auto;}
+.donate-hero-icon{
+  width:64px; height:64px; border-radius:18px; margin:0 auto 18px; display:flex; align-items:center;
+  justify-content:center; font-size:30px; background:rgba(255,201,77,.12); border:1px solid rgba(255,201,77,.3);
+}
+.donate-hero h2{font-family:'Chakra Petch',sans-serif; font-size:22px; font-weight:700; margin-bottom:10px;}
+.donate-perks{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:24px 0; text-align:left;}
+@media (max-width:640px){.donate-perks{grid-template-columns:1fr;}}
+.donate-perk{padding:14px; display:flex; gap:10px; align-items:flex-start;}
+.donate-perk-icon{font-size:16px; flex-shrink:0;}
+.donate-perk-text{font-size:12px; color:var(--muted); line-height:1.5;}
+.donate-cta{width:100%; justify-content:center; padding:13px; font-size:14px;}

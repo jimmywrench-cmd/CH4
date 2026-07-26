@@ -7,12 +7,16 @@ import RoleBadge from "../RoleBadge";
 import { useAnnouncements, Announcement } from "@/lib/client/useAnnouncements";
 import { playAnnouncementChime } from "@/lib/client/sound";
 
+const TITLE_MAX = 80;
+const BODY_MAX = 1000;
+
 export default function AnnouncementsView() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   const { announcements, reload } = useAnnouncements((a) => {
     playAnnouncementChime();
@@ -50,6 +54,11 @@ export default function AnnouncementsView() {
   }
 
   async function deleteAnnouncement(id: number) {
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id);
+      return;
+    }
+    setConfirmDeleteId(null);
     const res = await fetch(`/api/announcements/${id}`, { method: "DELETE" });
     if (res.ok) {
       reload();
@@ -77,16 +86,43 @@ export default function AnnouncementsView() {
             type="text"
             placeholder="Title"
             value={title}
+            maxLength={TITLE_MAX}
             onChange={(e) => setTitle(e.target.value)}
           />
           <textarea
             placeholder="What's the announcement?"
             value={body}
+            maxLength={BODY_MAX}
             onChange={(e) => setBody(e.target.value)}
           />
-          <button className="btn btn-primary btn-sm" onClick={post} disabled={posting}>
-            {posting ? "Posting…" : "Post Announcement"}
-          </button>
+          <div className="announce-form-foot">
+            <span
+              className={`announce-char-count${body.length > BODY_MAX * 0.9 ? " limit" : ""}`}
+            >
+              {body.length}/{BODY_MAX}
+            </span>
+            <div className="flex gap8">
+              {(title || body) && (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setTitle("");
+                    setBody("");
+                  }}
+                  disabled={posting}
+                >
+                  Clear
+                </button>
+              )}
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={post}
+                disabled={posting || !title.trim() || !body.trim()}
+              >
+                {posting ? "Posting…" : "Post Announcement"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -103,16 +139,35 @@ export default function AnnouncementsView() {
                   {a.posted_by_username ? `${a.posted_by_username} · ` : ""}
                   {new Date(a.created_at).toLocaleString()}
                 </span>
-                {isStaff(user.role) && (
-                  <button
-                    className="msg-act-btn"
-                    title="Delete announcement"
-                    style={{ marginLeft: "auto" }}
-                    onClick={() => deleteAnnouncement(a.id)}
-                  >
-                    🗑
-                  </button>
-                )}
+                {isStaff(user.role) &&
+                  (confirmDeleteId === a.id ? (
+                    <div className="announce-delete-confirm">
+                      <span>Delete this?</span>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        style={{ padding: "3px 10px" }}
+                        onClick={() => deleteAnnouncement(a.id)}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        style={{ padding: "3px 10px" }}
+                        onClick={() => setConfirmDeleteId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="msg-act-btn"
+                      title="Delete announcement"
+                      style={{ marginLeft: "auto" }}
+                      onClick={() => deleteAnnouncement(a.id)}
+                    >
+                      🗑
+                    </button>
+                  ))}
               </div>
               <div className="announce-body">{a.body}</div>
             </div>

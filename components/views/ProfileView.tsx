@@ -136,6 +136,9 @@ export default function ProfileView({ ranks }: { ranks: Rank[] }) {
                   onChange={(e) => setBio(e.target.value)}
                   placeholder="Write a short bio…"
                 />
+                <div className="announce-char-count" style={{ textAlign: "right", marginTop: -4 }}>
+                  {bio.length}/300
+                </div>
               </div>
             )}
           </div>
@@ -150,12 +153,16 @@ export default function ProfileView({ ranks }: { ranks: Rank[] }) {
                 onClick={() => {
                   setEditing(false);
                   setUsername(user.username);
-                  setBio(user.bio);
+                  setBio(user.bio ?? "");
                 }}
               >
                 Cancel
               </button>
-              <button className="btn btn-primary btn-sm" onClick={saveBio} disabled={saving}>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={saveBio}
+                disabled={saving || !username.trim()}
+              >
                 {saving ? <span className="spinner" /> : "Save"}
               </button>
             </div>
