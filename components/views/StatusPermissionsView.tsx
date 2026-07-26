@@ -163,13 +163,17 @@ export default function StatusPermissionsView() {
                     const busy = saving === `${status}:${perm}`;
                     return (
                       <td key={status} style={{ textAlign: "center" }}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
+                        <select
+                          className="perm-select"
+                          data-state={checked ? "allow" : "deny"}
+                          value={checked ? "allow" : "deny"}
                           disabled={immutable || busy}
-                          onChange={(e) => toggle(status, perm, e.target.checked)}
-                          style={{ width: 16, height: 16, cursor: immutable ? "not-allowed" : "pointer" }}
-                        />
+                          onChange={(e) => toggle(status, perm, e.target.value === "allow")}
+                          style={{ cursor: immutable ? "not-allowed" : "pointer" }}
+                        >
+                          <option value="allow">Allowed</option>
+                          <option value="deny">Denied</option>
+                        </select>
                       </td>
                     );
                   })}

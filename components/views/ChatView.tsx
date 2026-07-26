@@ -10,6 +10,14 @@ import NewRoomModal from "../NewRoomModal";
 
 type Active = { type: "room"; slug: string } | { type: "dm"; id: number };
 
+async function safeJson(res: Response) {
+  try {
+    return await res.json();
+  } catch {
+    return {};
+  }
+}
+
 export default function ChatView() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -21,22 +29,43 @@ export default function ChatView() {
 
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<any | null>(null);
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showNewRoom, setShowNewRoom] = useState(false);
+  const [sidebarError, setSidebarError] = useState<string | null>(null);
+  const [messagesLoading, setMessagesLoading] = useState(true);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Sidebar lists: rooms load once + refresh when a new one is made.
   // Groups poll gently so new invites show up without a refresh.
   async function loadRooms() {
-    const res = await fetch("/api/chat/rooms");
-    const data = await res.json();
-    setRooms(data.rooms ?? []);
+    try {
+      const res = await fetch("/api/chat/rooms");
+      const data = await safeJson(res);
+      if (!res.ok) {
+        setSidebarError(data.error || `Couldn't load rooms (${res.status}).`);
+        return;
+      }
+      setRooms(data.rooms ?? []);
+      setSidebarError(null);
+    } catch {
+      setSidebarError("Couldn't reach the server to load rooms.");
+    }
   }
   async function loadGroups() {
-    const res = await fetch("/api/dms");
-    const data = await res.json();
-    setGroups(data.groups ?? []);
+    try {
+      const res = await fetch("/api/dms");
+      const data = await safeJson(res);
+      if (!res.ok) {
+        setSidebarError((prev) => prev ?? data.error ?? `Couldn't load DMs (${res.status}).`);
+        return;
+      }
+      setGroups(data.groups ?? []);
+    } catch {
+      setSidebarError((prev) => prev ?? "Couldn't reach the server to load DMs.");
+    }
   }
 
   useEffect(() => {
@@ -48,19 +77,38 @@ export default function ChatView() {
 
   // Active conversation's messages.
   async function loadMessages() {
-    if (active.type === "room") {
-      const res = await fetch(`/api/chat?room=${encodeURIComponent(active.slug)}`);
-      const data = await res.json();
-      setMessages(data.messages ?? []);
-    } else {
-      const res = await fetch(`/api/dms/${active.id}`);
-      const data = await res.json();
-      setMessages(data.messages ?? []);
-      setDmMembers(data.members ?? []);
+    try {
+      if (active.type === "room") {
+        const res = await fetch(`/api/chat?room=${encodeURIComponent(active.slug)}`);
+        const data = await safeJson(res);
+        if (!res.ok) {
+          setMessagesError(data.error || `Couldn't load messages (${res.status}).`);
+          setMessagesLoading(false);
+          return;
+        }
+        setMessages(data.messages ?? []);
+      } else {
+        const res = await fetch(`/api/dms/${active.id}`);
+        const data = await safeJson(res);
+        if (!res.ok) {
+          setMessagesError(data.error || `Couldn't load messages (${res.status}).`);
+          setMessagesLoading(false);
+          return;
+        }
+        setMessages(data.messages ?? []);
+        setDmMembers(data.members ?? []);
+      }
+      setMessagesError(null);
+      setMessagesLoading(false);
+    } catch {
+      setMessagesError("Couldn't reach the server to load messages.");
+      setMessagesLoading(false);
     }
   }
 
   useEffect(() => {
+    setMessagesLoading(true);
+    setMessages([]);
     loadMessages();
     const id = setInterval(loadMessages, 4000);
     return () => clearInterval(id);
@@ -75,34 +123,50 @@ export default function ChatView() {
 
   async function send() {
     const text = input.trim();
-    if (!text) return;
+    if (!text || sending) return;
+    setSending(true);
     setInput("");
     const url = active.type === "room" ? "/api/chat" : `/api/dms/${active.id}`;
     const body =
       active.type === "room"
         ? { text, reply_to_id: replyTo?.id ?? null, room: active.slug }
         : { text, reply_to_id: replyTo?.id ?? null };
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) {
-      setReplyTo(null);
-      loadMessages();
-      if (active.type === "dm") loadGroups();
-    } else {
-      const data = await res.json();
-      toast(data.error || "Could not send message.");
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        setReplyTo(null);
+        loadMessages();
+        if (active.type === "dm") loadGroups();
+      } else {
+        const data = await safeJson(res);
+        setInput(text);
+        toast(data.error || `Could not send message (${res.status}).`);
+      }
+    } catch {
+      setInput(text);
+      toast("Could not reach the server to send that.");
+    } finally {
+      setSending(false);
     }
   }
 
   async function deleteMsg(id: number) {
     const url =
       active.type === "room" ? `/api/chat/${id}` : `/api/dms/${active.id}?message_id=${id}`;
-    const res = await fetch(url, { method: "DELETE" });
-    if (res.ok) loadMessages();
-    else toast("Could not delete message.");
+    try {
+      const res = await fetch(url, { method: "DELETE" });
+      if (res.ok) loadMessages();
+      else {
+        const data = await safeJson(res);
+        toast(data.error || "Could not delete message.");
+      }
+    } catch {
+      toast("Could not reach the server to delete that.");
+    }
   }
 
   const activeRoom = active.type === "room" ? rooms.find((r) => r.slug === active.slug) : null;
@@ -124,6 +188,22 @@ export default function ChatView() {
       <div className="chat-wrap chat-wrap-v2">
         {/* CONVERSATION LIST */}
         <div className="card chat-sidebar">
+          {sidebarError && (
+            <div className="notice small" style={{ marginBottom: 4 }}>
+              {sidebarError}
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ marginLeft: "auto" }}
+                onClick={() => {
+                  setSidebarError(null);
+                  loadRooms();
+                  loadGroups();
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          )}
           <div className="chat-sidebar-section">
             <div className="chat-sidebar-head">
               <span>Rooms</span>
@@ -133,6 +213,11 @@ export default function ChatView() {
                 </button>
               )}
             </div>
+            {rooms.length === 0 && !sidebarError && (
+              <div className="empty-state small" style={{ padding: "10px 12px" }}>
+                No rooms yet.
+              </div>
+            )}
             {rooms.map((r) => (
               <button
                 key={r.id}
@@ -193,46 +278,70 @@ export default function ChatView() {
             )}
           </div>
           <div className="chat-msgs">
-            {messages.map((m) => {
-              const canDelete = m.user_id === user.id || isStaff(user.role);
-              return (
-                <div className="msg" key={m.id}>
-                  <div className="avatar" style={{ width: 32, height: 32, fontSize: 11 }}>
-                    {m.username.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="msg-body">
-                    {m.reply_username && (
-                      <div className="msg-reply-ref">
-                        ↳ replying to {m.reply_username}: {m.reply_text?.slice(0, 60)}
-                      </div>
-                    )}
-                    <div className="msg-top">
-                      <span className="msg-name">{m.username}</span>
-                      <RoleBadge role={m.role} />
-                      {(m.custom_roles ?? []).map((r: CustomRole) => (
-                        <CustomRoleBadge key={r.id} role={r} size="sm" />
-                      ))}
-                      <span className="msg-meta">
-                        {m.level_label ?? `Level ${m.level}`} ·{" "}
-                        {new Date(m.created_at).toLocaleTimeString()}
-                      </span>
+            {messagesLoading && (
+              <div className="empty-state small">
+                <span className="spinner" style={{ marginRight: 8, verticalAlign: -2 }} />
+                Loading messages…
+              </div>
+            )}
+            {!messagesLoading && messagesError && (
+              <div className="notice small" style={{ marginBottom: 0 }}>
+                {messagesError}
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ marginLeft: "auto" }}
+                  onClick={() => {
+                    setMessagesLoading(true);
+                    loadMessages();
+                  }}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            {!messagesLoading &&
+              !messagesError &&
+              messages.map((m) => {
+                const own = m.user_id === user.id;
+                const canDelete = own || isStaff(user.role);
+                return (
+                  <div className={`msg${own ? " msg-own" : ""}`} key={m.id}>
+                    <div className="avatar" style={{ width: 32, height: 32, fontSize: 11 }}>
+                      {m.username.slice(0, 2).toUpperCase()}
                     </div>
-                    <div className="msg-text">{m.text}</div>
-                  </div>
-                  <div className="msg-actions">
-                    <button className="msg-act-btn" title="Reply" onClick={() => setReplyTo(m)}>
-                      ↩
-                    </button>
-                    {canDelete && (
-                      <button className="msg-act-btn" title="Delete" onClick={() => deleteMsg(m.id)}>
-                        🗑
+                    <div className="msg-body">
+                      {m.reply_username && (
+                        <div className="msg-reply-ref">
+                          ↳ replying to {m.reply_username}: {m.reply_text?.slice(0, 60)}
+                        </div>
+                      )}
+                      <div className="msg-top">
+                        <span className="msg-name">{m.username}</span>
+                        <RoleBadge role={m.role} />
+                        {(m.custom_roles ?? []).map((r: CustomRole) => (
+                          <CustomRoleBadge key={r.id} role={r} size="sm" />
+                        ))}
+                        <span className="msg-meta">
+                          {m.level_label ?? `Level ${m.level}`} ·{" "}
+                          {new Date(m.created_at).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <div className="msg-text">{m.text}</div>
+                    </div>
+                    <div className="msg-actions">
+                      <button className="msg-act-btn" title="Reply" onClick={() => setReplyTo(m)}>
+                        ↩
                       </button>
-                    )}
+                      {canDelete && (
+                        <button className="msg-act-btn" title="Delete" onClick={() => deleteMsg(m.id)}>
+                          🗑
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-            {messages.length === 0 && (
+                );
+              })}
+            {!messagesLoading && !messagesError && messages.length === 0 && (
               <div className="empty-state small">No messages yet — say hello.</div>
             )}
             <div ref={bottomRef} />
@@ -247,13 +356,18 @@ export default function ChatView() {
             <input
               placeholder={active.type === "room" ? `Message #${active.slug}` : "Message this group"}
               value={input}
+              disabled={!!messagesError}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") send();
               }}
             />
-            <button className="btn btn-primary btn-sm" onClick={send}>
-              Send
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={send}
+              disabled={!input.trim() || sending || !!messagesError}
+            >
+              {sending ? "Sending…" : "Send"}
             </button>
           </div>
         </div>

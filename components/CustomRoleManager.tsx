@@ -5,7 +5,7 @@ import { useToast } from "./Toast";
 import CustomRoleBadge, { CustomRole } from "./CustomRoleBadge";
 
 const SWATCHES = [
-  "#e6e6e6", "#4d7dff", "#7d6bff", "#9b5cff", "#c896ff",
+  "#f0f0f2", "#c7c7cf", "#9c9ca4", "#6b6b73", "#e6e6e6",
   "#ffc94d", "#ff9f4d", "#ff5c5c", "#4dff9f", "#4dd9ff",
 ];
 

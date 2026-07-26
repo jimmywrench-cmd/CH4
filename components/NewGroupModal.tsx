@@ -79,20 +79,26 @@ export default function NewGroupModal({
         />
 
         <div className="member-pick-list">
-          {filtered.map((u) => (
-            <label className="member-pick-row" key={u.id}>
-              <input
-                type="checkbox"
-                checked={selected.has(u.id)}
-                onChange={() => toggle(u.id)}
-              />
-              <div className="avatar" style={{ width: 26, height: 26, fontSize: 10 }}>
-                {u.username.slice(0, 2).toUpperCase()}
-              </div>
-              <span className="small">{u.username}</span>
-              <RoleBadge role={u.role} />
-            </label>
-          ))}
+          {filtered.map((u) => {
+            const isSelected = selected.has(u.id);
+            return (
+              <button
+                type="button"
+                className={`member-pick-row${isSelected ? " selected" : ""}`}
+                key={u.id}
+                onClick={() => toggle(u.id)}
+              >
+                <span className={`member-pick-check${isSelected ? " checked" : ""}`}>
+                  {isSelected && "✓"}
+                </span>
+                <div className="avatar" style={{ width: 26, height: 26, fontSize: 10 }}>
+                  {u.username.slice(0, 2).toUpperCase()}
+                </div>
+                <span className="small">{u.username}</span>
+                <RoleBadge role={u.role} />
+              </button>
+            );
+          })}
           {filtered.length === 0 && (
             <div className="empty-state small">No matching users.</div>
           )}

@@ -2,7 +2,7 @@
 
 import { Rank, rankBounds } from "@/lib/ranks";
 
-const RANK_COLOR_STEPS = ["#4d7dff", "#7d6bff", "#9b5cff", "#c896ff", "#ffc94d"];
+const RANK_COLOR_STEPS = ["#8a8a92", "#a4a4ac", "#c2c2c8", "#e4e4e8", "#ffc94d"];
 
 function rankColor(sortIndex: number, total: number) {
   const t = total <= 1 ? 0 : sortIndex / (total - 1);
