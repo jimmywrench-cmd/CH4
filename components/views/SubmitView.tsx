@@ -105,7 +105,7 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
         <div className="card" style={{ padding: 26 }}>
           <div className="field">
             <label>Rule Breaker&apos;s Name</label>
-            <div className="field-locked">🔒 {user.username}</div>
+            <div className="field-unlocked"></div>
           </div>
           <div className="field">
             <label>Short Description</label>

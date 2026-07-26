@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireStaff } from "@/lib/guard";
+import { requirePermission } from "@/lib/guard";
 
 export async function GET() {
   const rows = await query(
@@ -15,7 +15,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const guarded = await requireStaff();
+  const guarded = await requirePermission("create_announcements");
   if ("error" in guarded) return guarded.error;
 
   let body: { title?: string; body?: string };

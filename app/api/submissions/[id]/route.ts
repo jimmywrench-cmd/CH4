@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
-import { isStaff } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 
 export async function DELETE(
   req: NextRequest,
@@ -19,7 +19,8 @@ export async function DELETE(
     return NextResponse.json({ error: "Submission not found." }, { status: 404 });
   }
 
-  const canDelete = sub.user_id === guarded.user.id || isStaff(guarded.user.role);
+  const canDelete =
+    sub.user_id === guarded.user.id || (await hasPermission(guarded.user, "deny_videos"));
   if (!canDelete) {
     return NextResponse.json({ error: "Not allowed." }, { status: 403 });
   }

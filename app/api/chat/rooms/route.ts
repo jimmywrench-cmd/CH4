@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
-import { requireUser, requireStaff } from "@/lib/guard";
+import { requireUser, requirePermission } from "@/lib/guard";
 
 const SLUG_RE = /^[a-z0-9-]{2,30}$/;
 
@@ -18,7 +18,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const guarded = await requireStaff();
+  const guarded = await requirePermission("create_chat_rooms");
   if ("error" in guarded) return guarded.error;
 
   let body: { slug?: string; name?: string; description?: string };

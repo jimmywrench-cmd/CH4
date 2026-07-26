@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdmin } from "@/lib/guard";
+import { requirePermission } from "@/lib/guard";
 
 export async function GET() {
   const rows = await query(
@@ -10,7 +10,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const guarded = await requireAdmin();
+  const guarded = await requirePermission("manage_rank_requirements");
   if ("error" in guarded) return guarded.error;
 
   let body: { name?: string; min_level?: number };

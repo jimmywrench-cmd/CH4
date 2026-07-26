@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireStaff } from "@/lib/guard";
+import { requirePermission } from "@/lib/guard";
 
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const guarded = await requireStaff();
+  const guarded = await requirePermission("manage_announcements");
   if ("error" in guarded) return guarded.error;
 
   const rows = await query(

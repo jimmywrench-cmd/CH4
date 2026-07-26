@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireUser, requireAdmin } from "@/lib/guard";
-import { isOwner } from "@/lib/auth";
+import { requireUser, requirePermission } from "@/lib/guard";
+import { isOwner, isOwnerOrCoOwner } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 
-const ROLES = ["Member", "Verified", "Moderator", "Admin", "Owner"] as const;
+const ROLES = [
+  "Member",
+  "Verified",
+  "Moderator",
+  "Admin",
+  "Owner",
+  "Co-Owner",
+  "Helper",
+] as const;
 
 // PATCH — two modes:
 // 1. Self profile edit (bio) — any signed-in user, own account only.
@@ -36,13 +45,19 @@ export async function PATCH(
     body.banned !== undefined;
 
   if (wantsAdminField) {
-    const guarded = await requireAdmin();
+    const guarded = await requireUser();
     if ("error" in guarded) return guarded.error;
 
     const sets: string[] = [];
     const values: any[] = [];
 
     if (body.level !== undefined) {
+      if (!(await hasPermission(guarded.user, "change_user_levels"))) {
+        return NextResponse.json(
+          { error: "You don't have permission to change levels." },
+          { status: 403 }
+        );
+      }
       const raw = String(body.level).trim();
       const isPlainInt = /^\d+$/.test(raw);
       if (isPlainInt) {
@@ -62,6 +77,12 @@ export async function PATCH(
       }
     }
     if (body.role !== undefined) {
+      if (!(await hasPermission(guarded.user, "change_user_statuses"))) {
+        return NextResponse.json(
+          { error: "You don't have permission to change statuses." },
+          { status: 403 }
+        );
+      }
       if (!ROLES.includes(body.role)) {
         return NextResponse.json({ error: "Invalid role." }, { status: 400 });
       }
@@ -71,14 +92,33 @@ export async function PATCH(
           { status: 403 }
         );
       }
+      if (body.role === "Co-Owner" && !isOwnerOrCoOwner(guarded.user.role)) {
+        return NextResponse.json(
+          { error: "Only an Owner or Co-Owner can grant Co-Owner." },
+          { status: 403 }
+        );
+      }
       values.push(body.role);
       sets.push(`role = $${values.length}`);
     }
     if (body.suspended !== undefined) {
+      if (!(await hasPermission(guarded.user, "suspend_users"))) {
+        return NextResponse.json(
+          { error: "You don't have permission to suspend users." },
+          { status: 403 }
+        );
+      }
       values.push(!!body.suspended);
       sets.push(`suspended = $${values.length}`);
     }
     if (body.banned !== undefined) {
+      const neededPermission = body.banned ? "ban_users" : "unban_users";
+      if (!(await hasPermission(guarded.user, neededPermission))) {
+        return NextResponse.json(
+          { error: "You don't have permission to do that." },
+          { status: 403 }
+        );
+      }
       values.push(!!body.banned);
       sets.push(`banned = $${values.length}`);
     }
@@ -150,7 +190,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const guarded = await requireAdmin();
+  const guarded = await requirePermission("delete_users");
   if ("error" in guarded) return guarded.error;
 
   if (guarded.user.id === id) {

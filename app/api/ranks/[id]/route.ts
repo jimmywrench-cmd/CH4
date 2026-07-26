@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdmin } from "@/lib/guard";
+import { requirePermission } from "@/lib/guard";
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const guarded = await requireAdmin();
+  const guarded = await requirePermission("manage_rank_requirements");
   if ("error" in guarded) return guarded.error;
 
   let body: { min_level?: number; name?: string; max_level?: number | null };
@@ -66,7 +66,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const guarded = await requireAdmin();
+  const guarded = await requirePermission("manage_rank_requirements");
   if ("error" in guarded) return guarded.error;
 
   const remaining = await query<{ count: string }>(`select count(*)::text as count from ranks`);

@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth, isAdmin } from "@/lib/client/AuthContext";
+import { useAuth, isAdmin, isOwnerOrCoOwner } from "@/lib/client/AuthContext";
 import { useToast } from "../Toast";
 import { Rank, rankForLevel, rankBounds, displayRankName } from "@/lib/ranks";
 import RoleBadge from "../RoleBadge";
+import StatusPermissionsView from "./StatusPermissionsView";
 
-type DashTab = "review" | "users" | "analytics" | "announce" | "ranks";
+type DashTab = "review" | "users" | "analytics" | "announce" | "ranks" | "permissions";
 
-const ROLE_CYCLE = ["Member", "Verified", "Moderator", "Admin", "Owner"];
-const ROLE_DISPLAY: Record<string, string> = { Admin: "Co-Owner" };
-const roleLabel = (r: string) => ROLE_DISPLAY[r] ?? r;
+const ROLE_CYCLE = ["Member", "Verified", "Helper", "Moderator", "Admin", "Co-Owner", "Owner"];
+const roleLabel = (r: string) => r;
 
 export default function DashboardView({
   ranks,
@@ -22,6 +22,7 @@ export default function DashboardView({
   const { user } = useAuth();
   const { toast } = useToast();
   const admin = user ? isAdmin(user.role) : false;
+  const ownerOrCoOwner = user ? isOwnerOrCoOwner(user.role) : false;
   const [tab, setTab] = useState<DashTab>("review");
 
   const [queue, setQueue] = useState<any[]>([]);
@@ -46,7 +47,14 @@ export default function DashboardView({
   }, []);
 
   const tabs: DashTab[] = admin
-    ? ["review", "users", "analytics", "announce", "ranks"]
+    ? [
+        "review",
+        "users",
+        "analytics",
+        "announce",
+        "ranks",
+        ...(ownerOrCoOwner ? (["permissions"] as DashTab[]) : []),
+      ]
     : ["review", "users", "analytics"];
 
   async function approve(id: number) {
@@ -238,6 +246,7 @@ export default function DashboardView({
                 analytics: "Analytics",
                 announce: "Announcements",
                 ranks: "Rank Requirements",
+                permissions: "Status Permissions",
               }[t]
             }
           </button>
@@ -544,6 +553,8 @@ export default function DashboardView({
           </button>
         </div>
       )}
+
+      {tab === "permissions" && ownerOrCoOwner && <StatusPermissionsView />}
     </div>
   );
 }

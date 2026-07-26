@@ -20,7 +20,7 @@ function getSecret() {
 export type PublicUser = {
   id: string;
   username: string;
-  role: "Member" | "Verified" | "Moderator" | "Admin" | "Owner";
+  role: "Member" | "Verified" | "Moderator" | "Admin" | "Owner" | "Co-Owner" | "Helper";
   level: number;
   level_label: string | null;
   bio: string;
@@ -192,11 +192,20 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
 }
 
 export function isStaff(role: PublicUser["role"]) {
-  return role === "Moderator" || role === "Admin" || role === "Owner";
+  return (
+    role === "Helper" ||
+    role === "Moderator" ||
+    role === "Admin" ||
+    role === "Co-Owner" ||
+    role === "Owner"
+  );
 }
 export function isAdmin(role: PublicUser["role"]) {
-  return role === "Admin" || role === "Owner";
+  return role === "Admin" || role === "Co-Owner" || role === "Owner";
 }
 export function isOwner(role: PublicUser["role"]) {
   return role === "Owner";
+}
+export function isOwnerOrCoOwner(role: PublicUser["role"]) {
+  return role === "Owner" || role === "Co-Owner";
 }

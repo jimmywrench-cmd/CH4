@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
-import { isStaff } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 
 export async function DELETE(
   req: NextRequest,
@@ -17,7 +17,9 @@ export async function DELETE(
   );
   if (!msg) return NextResponse.json({ error: "Message not found." }, { status: 404 });
 
-  const canDelete = msg.user_id === guarded.user.id || isStaff(guarded.user.role);
+  const canDelete =
+    msg.user_id === guarded.user.id ||
+    (await hasPermission(guarded.user, "delete_chat_messages"));
   if (!canDelete) {
     return NextResponse.json({ error: "Not allowed." }, { status: 403 });
   }
