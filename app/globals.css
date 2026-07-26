@@ -83,6 +83,18 @@ button{font-family:inherit; cursor:pointer; border:none;}
   z-index:50;
 }
 .brand{display:flex; align-items:center; gap:10px; padding:0 8px 26px 8px;}
+.donate-pill{
+  display:inline-flex; align-items:center; gap:6px;
+  margin:-14px 8px 18px 8px;
+  padding:5px 12px;
+  font-size:11px; font-weight:600;
+  border-radius:20px;
+  background:rgba(255,201,77,.1);
+  border:1px solid rgba(255,201,77,.3);
+  color:var(--yellow);
+  width:fit-content;
+}
+.donate-pill:hover{background:rgba(255,201,77,.18);}
 .brand-mark{
   width:40px; height:40px; border-radius:12px;
   background:linear-gradient(135deg, #2a2a2e, #050505);
@@ -309,6 +321,24 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; hei
 .online-panel{padding:18px;}
 .online-item{display:flex; align-items:center; gap:10px; padding:7px 4px;}
 .online-status{width:8px; height:8px; border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green); flex-shrink:0;}
+
+/* chat: channel sidebar + group chats */
+.chat-wrap-3col{grid-template-columns:180px 1fr 260px;}
+@media (max-width:980px){.chat-wrap-3col{grid-template-columns:1fr;}}
+.channel-sidebar{padding:14px 10px; display:flex; flex-direction:column; gap:2px; overflow-y:auto;}
+.channel-sidebar-head{display:flex; align-items:center; justify-content:space-between; padding:6px 8px; margin-bottom:2px;}
+.channel-item{text-align:left; padding:8px 10px; border-radius:8px; font-size:13px; color:var(--muted); background:none;}
+.channel-item:hover{background:var(--glass); color:var(--text);}
+.channel-item.active{background:rgba(124,58,237,.15); color:var(--text); font-weight:600;}
+.channel-item-row{display:flex; align-items:center; gap:2px;}
+.channel-item-row .channel-item{flex:1;}
+.channel-item-row.active .channel-item{background:rgba(124,58,237,.15); color:var(--text); font-weight:600;}
+
+/* modal */
+.modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:100;}
+.modal-card{width:100%;}
+.pill{display:inline-flex; align-items:center; background:var(--glass); border:1px solid var(--border); border-radius:20px; padding:4px 10px; font-size:12px;}
+.pill button{color:var(--muted); font-size:11px;}
 
 /* chat sub-tabs (Chat / Announcements) */
 .chat-subtabs{display:flex; gap:6px; margin-bottom:14px;}

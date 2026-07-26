@@ -49,6 +49,17 @@ export default function AnnouncementsView() {
     }
   }
 
+  async function deleteAnnouncement(id: number) {
+    const res = await fetch(`/api/announcements/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      reload();
+      toast("Announcement deleted.");
+    } else {
+      const data = await res.json();
+      toast(data.error || "Could not delete announcement.");
+    }
+  }
+
   return (
     <div>
       <div className="section-title">
@@ -92,6 +103,16 @@ export default function AnnouncementsView() {
                   {a.posted_by_username ? `${a.posted_by_username} · ` : ""}
                   {new Date(a.created_at).toLocaleString()}
                 </span>
+                {isStaff(user.role) && (
+                  <button
+                    className="msg-act-btn"
+                    title="Delete announcement"
+                    style={{ marginLeft: "auto" }}
+                    onClick={() => deleteAnnouncement(a.id)}
+                  >
+                    🗑
+                  </button>
+                )}
               </div>
               <div className="announce-body">{a.body}</div>
             </div>

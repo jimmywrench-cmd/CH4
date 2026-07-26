@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth, isAdmin, isStaff } from "@/lib/client/AuthContext";
 import { useRanks } from "@/lib/client/useRanks";
+import { useAppliedTheme } from "@/lib/client/useTheme";
 import { useAnnouncements } from "@/lib/client/useAnnouncements";
 import { playNotifBlip, playAnnouncementChime } from "@/lib/client/sound";
 import { useToast } from "./Toast";
@@ -15,6 +16,7 @@ import AnnouncementsView from "./views/AnnouncementsView";
 import ProfileView from "./views/ProfileView";
 import DashboardView from "./views/DashboardView";
 import SearchView from "./views/SearchView";
+import DonateView from "./views/DonateView";
 
 export type ViewName =
   | "home"
@@ -24,7 +26,8 @@ export type ViewName =
   | "announcements"
   | "profile"
   | "dashboard"
-  | "search";
+  | "search"
+  | "donate";
 
 const NAV: { view: ViewName; label: string; icon: React.ReactNode }[] = [
   {
@@ -91,6 +94,7 @@ export default function AppShell() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const { ranks, reload: reloadRanks } = useRanks();
+  useAppliedTheme(user?.theme);
   const [view, setView] = useState<ViewName>("home");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -165,6 +169,10 @@ export default function AppShell() {
             <div className="brand-sub">Ops Network</div>
           </div>
         </div>
+
+        <button className="donate-pill" onClick={() => go("donate")}>
+          💛 Donate
+        </button>
 
         <div className="navsec">
           {NAV.map((n) => (
@@ -333,6 +341,7 @@ export default function AppShell() {
             <DashboardView ranks={ranks} reloadRanks={reloadRanks} />
           )}
           {view === "search" && <SearchView query={search} ranks={ranks} />}
+          {view === "donate" && <DonateView />}
         </div>
       </div>
     </div>
