@@ -1,8 +1,8 @@
 "use client";
 
 // Set this to your actual donation link (Ko-fi, PayPal, Stripe payment
-// link, etc). Left as a placeholder until you drop in a real one.
-const DONATE_URL = process.env.NEXT_PUBLIC_DONATE_URL || "";
+// link, etc). Can be overridden via the NEXT_PUBLIC_DONATE_URL env var.
+const DONATE_URL = process.env.NEXT_PUBLIC_DONATE_URL || "https://paypal.me/ossieee";
 
 export default function DonateView() {
   return (

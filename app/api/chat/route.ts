@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { query, queryOne } from "@/lib/db";
 import { requireUser } from "@/lib/guard";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const guarded = await requireUser();
   if ("error" in guarded) return guarded.error;
+
+  const { searchParams } = new URL(req.url);
+  const roomSlug = searchParams.get("room") || "general";
+
+  const room = await queryOne<{ id: number }>(
+    `select id from chat_rooms where slug = $1`,
+    [roomSlug]
+  );
+  if (!room) {
+    return NextResponse.json({ error: "Room not found." }, { status: 404 });
+  }
 
   const rows = await query(
     `select m.id, m.text, m.reply_to_id, m.pinned, m.created_at,
@@ -14,9 +25,10 @@ export async function GET() {
      join users u on u.id = m.user_id
      left join chat_messages rm on rm.id = m.reply_to_id and not rm.deleted
      left join users r on r.id = rm.user_id
-     where not m.deleted
+     where not m.deleted and m.room_id = $1
      order by m.created_at asc
-     limit 200`
+     limit 200`,
+    [room.id]
   );
 
   return NextResponse.json({ messages: rows });
@@ -33,7 +45,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { text?: string; reply_to_id?: number | null };
+  let body: { text?: string; reply_to_id?: number | null; room?: string };
   try {
     body = await req.json();
   } catch {
@@ -45,11 +57,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Message can't be empty." }, { status: 400 });
   }
 
+  const roomSlug = body.room || "general";
+  const room = await queryOne<{ id: number }>(
+    `select id from chat_rooms where slug = $1`,
+    [roomSlug]
+  );
+  if (!room) {
+    return NextResponse.json({ error: "Room not found." }, { status: 404 });
+  }
+
   const rows = await query(
-    `insert into chat_messages (user_id, text, reply_to_id)
-     values ($1, $2, $3)
+    `insert into chat_messages (user_id, text, reply_to_id, room_id)
+     values ($1, $2, $3, $4)
      returning id, text, reply_to_id, pinned, created_at`,
-    [guarded.user.id, text, body.reply_to_id ?? null]
+    [guarded.user.id, text, body.reply_to_id ?? null, room.id]
   );
 
   return NextResponse.json({ message: rows[0] });

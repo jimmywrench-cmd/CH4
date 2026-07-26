@@ -62,7 +62,7 @@ const NAV: { view: ViewName; label: string; icon: React.ReactNode }[] = [
   },
   {
     view: "chat",
-    label: "Community Chat",
+    label: "Chat",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
         <path d="M21 11.5a8.5 8.5 0 01-8.5 8.5H4l1.9-3.8A8.5 8.5 0 1121 11.5z" />
@@ -175,6 +175,7 @@ export default function AppShell() {
         </button>
 
         <div className="navsec">
+          <div className="navlabel">Community</div>
           {NAV.map((n) => (
             <button
               key={n.view}
