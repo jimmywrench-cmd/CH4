@@ -88,6 +88,7 @@ export default function ShortsView({ ranks }: { ranks: Rank[] }) {
 
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [active, setActive] = useState(0);
   const [sort, setSort] = useState("trending");
   const [showSearch, setShowSearch] = useState(false);
@@ -104,14 +105,23 @@ export default function ShortsView({ ranks }: { ranks: Rank[] }) {
 
   async function load() {
     setLoading(true);
+    setLoadError(false);
     try {
       const params = new URLSearchParams({ sort });
       if (q) params.set("q", q);
       if (tag) params.set("tag", tag);
       const res = await fetch(`/api/feed?${params.toString()}`);
+      if (!res.ok) {
+        setLoadError(true);
+        setVideos([]);
+        return;
+      }
       const data = await res.json();
       setVideos(data.videos ?? []);
       setActive(0);
+    } catch {
+      setLoadError(true);
+      setVideos([]);
     } finally {
       setLoading(false);
     }
@@ -339,7 +349,18 @@ export default function ShortsView({ ranks }: { ranks: Rank[] }) {
     return (
       <div>
         <ShortsSearchBar q={q} tag={tag} setQ={setQ} setTag={setTag} onSearch={load} show={showSearch} setShow={setShowSearch} sort={sort} setSort={setSort} />
-        <div className="empty-state">No clips match yet — approved submissions show up here.</div>
+        <div className="empty-state">
+          {loadError ? (
+            <>
+              Couldn't load clips.{" "}
+              <button className="btn btn-ghost btn-sm" onClick={load}>
+                Retry
+              </button>
+            </>
+          ) : (
+            "No clips match yet — approved submissions show up here."
+          )}
+        </div>
       </div>
     );
   }
@@ -734,14 +755,24 @@ function CommentsPanel({
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   async function load() {
     setLoading(true);
+    setLoadError(false);
     try {
       const res = await fetch(`/api/feed/${video.id}/comments?sort=${sort}`);
+      if (!res.ok) {
+        setLoadError(true);
+        setComments([]);
+        return;
+      }
       const data = await res.json();
       setComments(data.comments ?? []);
       onCountChange((data.comments ?? []).length);
+    } catch {
+      setLoadError(true);
+      setComments([]);
     } finally {
       setLoading(false);
     }
@@ -812,6 +843,8 @@ function CommentsPanel({
         <div className="shorts-comments-list">
           {loading ? (
             <div className="empty-state small">Loading…</div>
+          ) : loadError ? (
+            <div className="empty-state small">Couldn't load comments. Try again.</div>
           ) : video.comments_disabled ? (
             <div className="empty-state small">Comments are disabled on this video.</div>
           ) : comments.length === 0 ? (
