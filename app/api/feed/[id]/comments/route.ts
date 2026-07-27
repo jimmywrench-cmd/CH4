@@ -20,7 +20,7 @@ export async function GET(
   const rows = await query(
     `select c.id, c.text, c.reply_to_id, c.created_at,
             u.id as user_id, u.username, u.role, u.level,
-            r.username as reply_username, r.text as reply_text,
+            r.username as reply_username, rc.text as reply_text,
             (select count(*) from video_comment_likes vcl where vcl.comment_id = c.id)::int as like_count,
             exists(
               select 1 from video_comment_likes vcl2
