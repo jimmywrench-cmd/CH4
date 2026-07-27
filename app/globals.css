@@ -40,7 +40,7 @@
   --glow: 0 0 0 rgba(0,0,0,0);
 }
 *{box-sizing:border-box; margin:0; padding:0;}
-html{zoom:.9;}
+html{zoom:.75;}
 html,body{height:100%;}
 body{
   background:
@@ -161,7 +161,7 @@ button{font-family:inherit; cursor:pointer; border:none;}
 .uc-role{font-size:10.5px; color:var(--muted);}
 
 /* ---------- main ---------- */
-.main{flex:1; min-width:0; display:flex; flex-direction:column; min-height:100vh;}
+.main{flex:1; min-width:0;}
 .topbar{
   position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:16px;
   padding:14px 30px; background:rgba(5,5,5,.68); backdrop-filter:blur(24px) saturate(120%); border-bottom:1px solid var(--border);
@@ -200,10 +200,6 @@ button{font-family:inherit; cursor:pointer; border:none;}
 
 .view{padding:30px; max-width:1400px; margin:0 auto; display:none; animation:fadein .35s ease;}
 .view.active{display:block;}
-.view.active.view-shorts{
-  display:flex; flex-direction:column; padding:0; margin:0; max-width:none;
-  flex:1; min-height:0;
-}
 @keyframes fadein{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
 
 /* ---------- glass card ---------- */
@@ -231,7 +227,7 @@ button{font-family:inherit; cursor:pointer; border:none;}
 }
 
 /* notification tray */
-.notif-panel{width:340px; max-width:calc(100vw - 32px); max-height:420px; display:flex; flex-direction:column;}
+.notif-panel{width:340px; max-height:420px; display:flex; flex-direction:column;}
 .notif-panel-head{
   display:flex; align-items:center; justify-content:space-between; gap:10px;
   padding:14px 16px; border-bottom:1px solid var(--border); flex-shrink:0;
@@ -441,7 +437,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; hei
 
 /* modal */
 .modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,.65); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; z-index:100; padding:20px;}
-.modal-card{width:100%; max-width:380px; max-height:85vh; overflow-y:auto; padding:22px; background:linear-gradient(180deg, rgba(24,24,26,.96), rgba(8,8,8,.98)); border:1px solid var(--border-hi); box-shadow:0 20px 80px rgba(0,0,0,.7);}
+.modal-card{width:100%; max-width:380px; padding:22px; background:linear-gradient(180deg, rgba(24,24,26,.96), rgba(8,8,8,.98)); border:1px solid var(--border-hi); box-shadow:0 20px 80px rgba(0,0,0,.7);}
 .pill{display:inline-flex; align-items:center; background:var(--glass); border:1px solid var(--border); border-radius:20px; padding:4px 10px; font-size:12px;}
 .pill button{color:var(--muted); font-size:11px;}
 
@@ -690,7 +686,14 @@ tbody tr:hover td{background:rgba(255,255,255,.02);}
 .mp-user-name{font-weight:600; font-size:13px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
 .mp-user-id{font-size:10px; color:var(--muted2); font-family:'JetBrains Mono',monospace;}
 .mp-user-meta{font-size:10.5px; color:var(--muted2); margin-top:2px;}
+
+.mp-hover-card{
+  position:absolute; z-index:60; top:calc(100% + 8px); left:0; width:250px;
+  padding:16px; animation:mpPopIn .14s ease;
+}
 @keyframes mpPopIn{from{opacity:0; transform:translateY(-4px) scale(.98);} to{opacity:1; transform:translateY(0) scale(1);}}
+.mp-hover-row{display:flex; justify-content:space-between; font-size:11.5px; padding:4px 0; color:var(--muted);}
+.mp-hover-row b{color:var(--text); font-weight:600;}
 
 .mp-level-cell{min-width:150px;}
 .mp-level-top{display:flex; align-items:baseline; gap:6px; margin-bottom:5px;}
@@ -780,7 +783,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02);}
    SHORTS — full-screen vertical video feed
    ============================================================ */
 .shorts-page{
-  position:relative; flex:1; min-height:0; overflow:hidden;
+  position:relative; height:calc(100vh - 64px); margin:-30px; overflow:hidden;
   border-radius:0; background:#000;
 }
 .shorts-topbar{
@@ -804,7 +807,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02);}
   flex-shrink:0; background:rgba(10,10,18,.55); backdrop-filter:blur(10px);
 }
 .shorts-search-panel{
-  position:absolute; top:44px; right:18px; width:260px; max-width:calc(100vw - 36px); padding:12px;
+  position:absolute; top:44px; right:18px; width:260px; padding:12px;
   background:rgba(10,10,18,.88); backdrop-filter:blur(16px); border:1px solid var(--border);
   border-radius:14px; display:flex; flex-direction:column; gap:8px; z-index:41;
   box-shadow:0 12px 32px rgba(0,0,0,.45); animation:shortsFadeIn .15s ease;
@@ -940,6 +943,7 @@ tbody tr:hover td{background:rgba(255,255,255,.02);}
 .shorts-comments-list .msg + .msg{border-top:1px solid var(--border);}
 
 @media (max-width:720px){
+  .shorts-page{margin:-30px; height:100dvh;}
   .shorts-controls{display:none;}
   .shorts-info{max-width:78%; bottom:calc(28px + env(safe-area-inset-bottom));}
   .shorts-actions{bottom:calc(110px + env(safe-area-inset-bottom));}
