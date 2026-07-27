@@ -52,6 +52,7 @@ export const PERMISSIONS = [
   "view_analytics",
   "export_data",
   "access_beta_tools",
+  "manage_shorts",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -89,6 +90,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   view_analytics: "View analytics",
   export_data: "Export data",
   access_beta_tools: "Access beta tools",
+  manage_shorts: "Moderate Shorts (feature/pin/hide/remove, comments)",
 };
 
 export type PermissionMatrix = Record<Status, Record<Permission, boolean>>;
@@ -101,13 +103,27 @@ const ALL_FALSE: Record<Permission, boolean> = Object.fromEntries(
   PERMISSIONS.map((p) => [p, false])
 ) as Record<Permission, boolean>;
 
+// Room/channel management and chat moderation are Owner/Co-Owner-only
+// by design (Discord-style: only server owners manage channels) — DMs
+// and group chats are unaffected, since those never required any of
+// these permissions to begin with.
+const ROOM_OWNER_ONLY: Permission[] = [
+  "manage_chat",
+  "delete_chat_messages",
+  "manage_rooms",
+  "create_chat_rooms",
+  "delete_chat_rooms",
+];
+
 // Admin: everything except delete_users, change_user_statuses,
-// edit_status_permissions, manage_rank_requirements.
+// edit_status_permissions, manage_rank_requirements, and room/chat
+// management (Owner/Co-Owner only).
 const ADMIN_OFF: Permission[] = [
   "delete_users",
   "change_user_statuses",
   "edit_status_permissions",
   "manage_rank_requirements",
+  ...ROOM_OWNER_ONLY,
 ];
 
 // Moderator: Admin's restrictions, plus ban_users, all custom-role

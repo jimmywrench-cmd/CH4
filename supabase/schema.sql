@@ -119,6 +119,22 @@ create table if not exists public.notifications (
 create index if not exists notifs_user_idx on public.notifications (user_id, created_at desc);
 
 -- ------------------------------------------------------------
+-- FOLLOWS
+-- Users can follow/unfollow one another to visit each other's
+-- profiles from a personalized feed later on.
+-- ------------------------------------------------------------
+create table if not exists public.follows (
+  follower_id  uuid not null references public.users(id) on delete cascade,
+  following_id uuid not null references public.users(id) on delete cascade,
+  created_at   timestamptz not null default now(),
+  primary key (follower_id, following_id),
+  constraint follows_no_self_follow check (follower_id <> following_id)
+);
+
+create index if not exists follows_following_idx on public.follows (following_id);
+create index if not exists follows_follower_idx on public.follows (follower_id);
+
+-- ------------------------------------------------------------
 -- SESSIONS
 -- Server-issued session tokens (opaque random id, hashed at
 -- rest). The signed cookie the browser holds only ever contains
@@ -149,6 +165,7 @@ alter table public.announcements enable row level security;
 alter table public.notifications enable row level security;
 alter table public.ranks enable row level security;
 alter table public.sessions enable row level security;
+alter table public.follows enable row level security;
 
 -- Public read of non-sensitive profile fields; no anon writes.
 drop policy if exists users_read on public.users;
@@ -156,6 +173,9 @@ create policy users_read on public.users for select using (true);
 
 drop policy if exists ranks_read on public.ranks;
 create policy ranks_read on public.ranks for select using (true);
+
+drop policy if exists follows_read on public.follows;
+create policy follows_read on public.follows for select using (true);
 
 drop policy if exists submissions_read on public.submissions;
 create policy submissions_read on public.submissions for select using (true);

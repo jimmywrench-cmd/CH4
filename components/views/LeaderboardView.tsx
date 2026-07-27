@@ -12,7 +12,13 @@ const TABS: { key: string; label: string }[] = [
   { key: "contributors", label: "Top Contributors" },
 ];
 
-export default function LeaderboardView({ ranks }: { ranks: Rank[] }) {
+export default function LeaderboardView({
+  ranks,
+  onVisit,
+}: {
+  ranks: Rank[];
+  onVisit?: (userId: string) => void;
+}) {
   const [tab, setTab] = useState("level");
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +48,30 @@ export default function LeaderboardView({ ranks }: { ranks: Rank[] }) {
           </button>
         ))}
       </div>
+      {!loading && users.length >= 3 && (
+        <div className="card lb-podium mb18">
+          {[users[1], users[0], users[2]].map((u, i) => {
+            const place = i === 1 ? 1 : i === 0 ? 2 : 3;
+            const cls = place === 1 ? "gold" : place === 2 ? "silver" : "bronze";
+            const medal = place === 1 ? "🥇" : place === 2 ? "🥈" : "🥉";
+            return (
+              <div
+                className={`lb-podium-slot ${cls}`}
+                key={u.id}
+                onClick={() => onVisit?.(u.id)}
+                style={{ cursor: onVisit ? "pointer" : undefined }}
+              >
+                <div className="lb-podium-medal">{medal}</div>
+                <div className="avatar">{u.username.slice(0, 2).toUpperCase()}</div>
+                <div className="lb-podium-name">{u.username}</div>
+                <div className="lb-podium-meta">
+                  {u.level_label ? u.level_label : `Lvl ${u.level}`}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div className="card" style={{ padding: 8 }}>
         {loading ? (
           <div className="empty-state small">Loading…</div>
@@ -49,7 +79,12 @@ export default function LeaderboardView({ ranks }: { ranks: Rank[] }) {
           <div className="empty-state small">No members yet.</div>
         ) : (
           users.map((u, i) => (
-            <div className="lb-row" key={u.id}>
+            <div
+              className="lb-row"
+              key={u.id}
+              onClick={() => onVisit?.(u.id)}
+              style={{ cursor: onVisit ? "pointer" : undefined }}
+            >
               <div className={`lb-rank-num${i === 0 ? " top" : ""}`}>{i + 1}</div>
               <div className="avatar">{u.username.slice(0, 2).toUpperCase()}</div>
               <div style={{ flex: 1, minWidth: 0 }}>

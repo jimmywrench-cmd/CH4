@@ -4,7 +4,15 @@ import { useEffect, useState } from "react";
 import { Rank, rankForLevel, displayRankName } from "@/lib/ranks";
 import RoleBadge from "../RoleBadge";
 
-export default function SearchView({ query, ranks }: { query: string; ranks: Rank[] }) {
+export default function SearchView({
+  query,
+  ranks,
+  onVisit,
+}: {
+  query: string;
+  ranks: Rank[];
+  onVisit?: (userId: string) => void;
+}) {
   const [users, setUsers] = useState<any[]>([]);
 
   useEffect(() => {
@@ -36,7 +44,12 @@ export default function SearchView({ query, ranks }: { query: string; ranks: Ran
           <div className="empty-state small">No matches for &quot;{query}&quot;</div>
         ) : (
           results.map((u) => (
-            <div className="lb-row" key={u.id}>
+            <div
+              className="lb-row"
+              key={u.id}
+              onClick={() => onVisit?.(u.id)}
+              style={{ cursor: onVisit ? "pointer" : undefined }}
+            >
               <div className="avatar">{u.username.slice(0, 2).toUpperCase()}</div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: 13.5 }}>{u.username}</div>

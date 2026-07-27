@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { query, queryOne } from "@/lib/db";
 import { requireUser, requirePermission } from "@/lib/guard";
-import { isOwner, isOwnerOrCoOwner } from "@/lib/auth";
+import { isOwner, isOwnerOrCoOwner, getCurrentUser } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 
 const ROLES = [
@@ -13,6 +13,54 @@ const ROLES = [
   "Co-Owner",
   "Helper",
 ] as const;
+
+// GET — public profile: base user fields plus follower/following
+// counts and (if signed in) whether the viewer follows this user.
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  const profile = await queryOne(
+    `select id, username, role, level, level_label, bio, avatar_seed,
+            approved_count, rejected_count, created_at
+     from users where id = $1`,
+    [id]
+  );
+  if (!profile) return NextResponse.json({ error: "User not found." }, { status: 404 });
+
+  const [followerCount, followingCount] = await Promise.all([
+    queryOne<{ count: string }>(
+      `select count(*)::text as count from follows where following_id = $1`,
+      [id]
+    ),
+    queryOne<{ count: string }>(
+      `select count(*)::text as count from follows where follower_id = $1`,
+      [id]
+    ),
+  ]);
+
+  const viewer = await getCurrentUser();
+  let isFollowing = false;
+  if (viewer && viewer.id !== id) {
+    const row = await queryOne(
+      `select 1 from follows where follower_id = $1 and following_id = $2`,
+      [viewer.id, id]
+    );
+    isFollowing = !!row;
+  }
+
+  return NextResponse.json({
+    user: {
+      ...profile,
+      follower_count: Number(followerCount?.count ?? 0),
+      following_count: Number(followingCount?.count ?? 0),
+      is_following: isFollowing,
+      is_self: viewer?.id === id,
+    },
+  });
+}
 
 // PATCH — two modes:
 // 1. Self profile edit (bio) — any signed-in user, own account only.

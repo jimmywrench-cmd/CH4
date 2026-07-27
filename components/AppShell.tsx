@@ -17,6 +17,7 @@ import ProfileView from "./views/ProfileView";
 import DashboardView from "./views/DashboardView";
 import SearchView from "./views/SearchView";
 import DonateView from "./views/DonateView";
+import ShortsView from "./views/ShortsView";
 
 export type ViewName =
   | "home"
@@ -27,7 +28,8 @@ export type ViewName =
   | "profile"
   | "dashboard"
   | "search"
-  | "donate";
+  | "donate"
+  | "shorts";
 
 const NAV: { view: ViewName; label: string; icon: React.ReactNode }[] = [
   {
@@ -37,6 +39,16 @@ const NAV: { view: ViewName; label: string; icon: React.ReactNode }[] = [
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
         <path d="M3 11l9-8 9 8" />
         <path d="M5 10v10h14V10" />
+      </svg>
+    ),
+  },
+  {
+    view: "shorts",
+    label: "Shorts",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+        <rect x="5" y="3" width="14" height="18" rx="3" />
+        <path d="M10 9l6 3-6 3V9z" fill="currentColor" stroke="none" />
       </svg>
     ),
   },
@@ -96,6 +108,7 @@ export default function AppShell() {
   const { ranks, reload: reloadRanks } = useRanks();
   useAppliedTheme(user?.theme);
   const [view, setView] = useState<ViewName>("home");
+  const [profileTarget, setProfileTarget] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState<any[]>([]);
@@ -106,6 +119,8 @@ export default function AppShell() {
   const seenNotifIds = useRef<Set<number> | null>(null);
   const viewRef = useRef(view);
   viewRef.current = view;
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [scrolled, setScrolled] = useState(false);
 
   useAnnouncements((a) => {
     playAnnouncementChime();
@@ -151,6 +166,26 @@ export default function AppShell() {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
+  useEffect(() => {
+    const main = document.querySelector(".main");
+    function onScroll() {
+      setScrolled((main?.scrollTop ?? window.scrollY) > 4);
+    }
+    (main ?? window).addEventListener("scroll", onScroll);
+    return () => (main ?? window).removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    function onKeydown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeydown);
+    return () => document.removeEventListener("keydown", onKeydown);
+  }, []);
+
   async function markAllRead() {
     if (unreadCount === 0) return;
     setMarkingAll(true);
@@ -165,7 +200,14 @@ export default function AppShell() {
   function go(v: ViewName) {
     setView(v);
     setSidebarOpen(false);
+    if (v === "profile") setProfileTarget(null);
     if (v === "announcements") setUnreadAnnouncements(0);
+  }
+
+  function visit(userId: string) {
+    setView("profile");
+    setProfileTarget(userId === user?.id ? null : userId);
+    setSidebarOpen(false);
   }
 
   const unreadCount = notifs.filter((n) => !n.read).length;
@@ -248,7 +290,7 @@ export default function AppShell() {
 
       {/* MAIN */}
       <div className="main">
-        <div className="topbar">
+        <div className={`topbar${scrolled ? " is-scrolled" : ""}`}>
           <button
             className="icon-btn menu-toggle"
             onClick={() => setSidebarOpen((o) => !o)}
@@ -263,6 +305,7 @@ export default function AppShell() {
               <path d="M21 21l-4-4" />
             </svg>
             <input
+              ref={searchRef}
               placeholder="Search by username, level, rank, role…"
               value={search}
               onChange={(e) => {
@@ -270,6 +313,12 @@ export default function AppShell() {
                 setView(e.target.value.trim() ? "search" : "home");
               }}
             />
+            {!search && (
+              <span className="search-kbd">
+                <kbd>Ctrl</kbd>
+                <kbd>K</kbd>
+              </span>
+            )}
           </div>
           <div className="topbar-right">
             <div style={{ position: "relative" }} ref={notifRef}>
@@ -336,17 +385,24 @@ export default function AppShell() {
           </div>
         </div>
 
-        <div className="view active">
+        <div
+          className={`view active${view === "shorts" ? " view-shorts" : ""}${
+            view === "chat" ? " view-chat" : ""
+          }`}
+        >
           {view === "home" && <HomeView ranks={ranks} go={go} />}
+          {view === "shorts" && <ShortsView ranks={ranks} />}
           {view === "submit" && <SubmitView ranks={ranks} />}
-          {view === "leaderboard" && <LeaderboardView ranks={ranks} />}
-          {view === "chat" && <ChatView />}
+          {view === "leaderboard" && <LeaderboardView ranks={ranks} onVisit={visit} />}
+          {view === "chat" && <ChatView onVisit={visit} />}
           {view === "announcements" && <AnnouncementsView />}
-          {view === "profile" && <ProfileView ranks={ranks} />}
+          {view === "profile" && (
+            <ProfileView ranks={ranks} viewedUserId={profileTarget} onVisit={visit} />
+          )}
           {view === "dashboard" && isStaff(user.role) && (
             <DashboardView ranks={ranks} reloadRanks={reloadRanks} />
           )}
-          {view === "search" && <SearchView query={search} ranks={ranks} />}
+          {view === "search" && <SearchView query={search} ranks={ranks} onVisit={visit} />}
           {view === "donate" && <DonateView />}
         </div>
       </div>

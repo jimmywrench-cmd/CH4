@@ -8,42 +8,91 @@ import RoleBadge from "../RoleBadge";
 import Insignia from "../Insignia";
 import CustomRoleBadge, { CustomRole } from "../CustomRoleBadge";
 
-export default function ProfileView({ ranks }: { ranks: Rank[] }) {
-  const { user, refresh } = useAuth();
+type PublicProfile = {
+  id: string;
+  username: string;
+  role: string;
+  level: number;
+  level_label: string | null;
+  bio: string;
+  avatar_seed: string;
+  approved_count: number;
+  rejected_count: number;
+  created_at: string;
+  follower_count: number;
+  following_count: number;
+  is_following: boolean;
+  is_self: boolean;
+};
+
+export default function ProfileView({
+  ranks,
+  viewedUserId,
+  onVisit,
+}: {
+  ranks: Rank[];
+  viewedUserId?: string | null;
+  onVisit?: (userId: string) => void;
+}) {
+  const { user: me, refresh } = useAuth();
   const { toast } = useToast();
+  const targetId = viewedUserId ?? me?.id ?? null;
+  const isOwn = !!me && (!viewedUserId || viewedUserId === me.id);
+
+  const [profile, setProfile] = useState<PublicProfile | null>(null);
+  const [loading, setLoading] = useState(true);
   const [activity, setActivity] = useState<any[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
   const [editing, setEditing] = useState(false);
-  const [bio, setBio] = useState(user?.bio ?? "");
-  const [username, setUsername] = useState(user?.username ?? "");
+  const [bio, setBio] = useState("");
+  const [username, setUsername] = useState("");
   const [saving, setSaving] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [listModal, setListModal] = useState<null | "followers" | "following">(null);
+  const [listUsers, setListUsers] = useState<any[]>([]);
+  const [listLoading, setListLoading] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-    fetch(`/api/submissions?mine=1`)
+    if (!targetId) return;
+    setLoading(true);
+    fetch(`/api/users/${targetId}`)
       .then((r) => r.json())
-      .then((d) => setActivity(d.submissions ?? []));
-    fetch(`/api/users/${user.id}/roles`)
+      .then((d) => {
+        if (d.user) {
+          setProfile(d.user);
+          setBio(d.user.bio ?? "");
+          setUsername(d.user.username ?? "");
+        }
+      })
+      .finally(() => setLoading(false));
+    fetch(`/api/users/${targetId}/roles`)
       .then((r) => r.json())
       .then((d) => setCustomRoles(d.roles ?? []));
-  }, [user?.id]);
+    if (isOwn) {
+      fetch(`/api/submissions?mine=1`)
+        .then((r) => r.json())
+        .then((d) => setActivity(d.submissions ?? []));
+    }
+  }, [targetId, isOwn]);
 
   useEffect(() => {
-    setBio(user?.bio ?? "");
-    setUsername(user?.username ?? "");
-  }, [user?.bio, user?.username]);
+    setEditing(false);
+  }, [targetId]);
 
-  if (!user) return null;
+  if (!me || !targetId || !profile) {
+    return loading ? <div className="empty-state small">Loading…</div> : null;
+  }
 
-  const rank = rankForLevel(ranks, user.level);
-  const { levelsInRank, posInRank } = nextLevelInfo(ranks, user.level);
+  const rank = rankForLevel(ranks, profile.level);
+  const { levelsInRank, posInRank } = nextLevelInfo(ranks, profile.level);
   const pct = levelsInRank ? Math.min(100, (posInRank / levelsInRank) * 100) : 100;
-  const total = user.approved_count + user.rejected_count;
+  const total = profile.approved_count + profile.rejected_count;
+  const isMaxLevel = !levelsInRank && !profile.level_label;
 
   async function saveBio() {
     setSaving(true);
     try {
-      const res = await fetch(`/api/users/${user!.id}`, {
+      const res = await fetch(`/api/users/${me!.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bio, username }),
@@ -54,6 +103,7 @@ export default function ProfileView({ ranks }: { ranks: Rank[] }) {
         return;
       }
       await refresh();
+      setProfile((p) => (p ? { ...p, bio, username } : p));
       setEditing(false);
       toast("Profile updated.");
     } finally {
@@ -61,16 +111,49 @@ export default function ProfileView({ ranks }: { ranks: Rank[] }) {
     }
   }
 
+  async function toggleFollow() {
+    if (!profile) return;
+    setFollowBusy(true);
+    try {
+      const res = await fetch(`/api/users/${profile.id}/follow`, {
+        method: profile.is_following ? "DELETE" : "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast(data.error || "Could not update follow status.");
+        return;
+      }
+      setProfile((p) =>
+        p ? { ...p, is_following: data.following, follower_count: data.follower_count } : p
+      );
+    } finally {
+      setFollowBusy(false);
+    }
+  }
+
+  async function openList(kind: "followers" | "following") {
+    if (!profile) return;
+    setListModal(kind);
+    setListLoading(true);
+    try {
+      const res = await fetch(`/api/users/${profile.id}/${kind}`);
+      const data = await res.json();
+      setListUsers(data.users ?? []);
+    } finally {
+      setListLoading(false);
+    }
+  }
+
   return (
     <div>
-      <div className="card mb18">
+      <div className={`card mb18${isMaxLevel ? " profile-hero-max" : ""}`}>
         <div className="profile-hero">
-          <Insignia ranks={ranks} level={user.level} size={72} />
+          <div className={isMaxLevel ? "insignia-prestige" : undefined}>
+            <Insignia ranks={ranks} level={profile.level} size={72} />
+          </div>
           <div style={{ flex: 1, minWidth: 220 }}>
             <div className="profile-name-row mb10">
-              {!editing ? (
-                <div className="profile-name">{user.username}</div>
-              ) : (
+              {isOwn && editing ? (
                 <input
                   type="text"
                   value={username}
@@ -87,21 +170,32 @@ export default function ProfileView({ ranks }: { ranks: Rank[] }) {
                     maxWidth: 200,
                   }}
                 />
+              ) : (
+                <div className="profile-name">{profile.username}</div>
               )}
-              <RoleBadge role={user.role} />
+              <RoleBadge role={profile.role} />
+              {isMaxLevel && <span className="max-level-badge">👑 MAX LEVEL</span>}
             </div>
             <div className="flex gap16 muted small mb14" style={{ flexWrap: "wrap" }}>
-              {user.level_label ? (
-                <span>{user.level_label}</span>
+              {profile.level_label ? (
+                <span>{profile.level_label}</span>
               ) : (
                 <>
                   <span>Rank: {rank.name}</span>
                   <span>·</span>
-                  <span>Level {user.level}</span>
+                  <span>Level {profile.level}</span>
                 </>
               )}
               <span>·</span>
-              <span>Joined {new Date(user.created_at).toLocaleDateString()}</span>
+              <span>Joined {new Date(profile.created_at).toLocaleDateString()}</span>
+            </div>
+            <div className="flex gap16 mb14" style={{ flexWrap: "wrap" }}>
+              <button className="follow-stat" onClick={() => openList("followers")}>
+                <b>{profile.follower_count}</b> <span className="muted">Followers</span>
+              </button>
+              <button className="follow-stat" onClick={() => openList("following")}>
+                <b>{profile.following_count}</b> <span className="muted">Following</span>
+              </button>
             </div>
             {customRoles.length > 0 && (
               <div className="flex gap8 mb14" style={{ flexWrap: "wrap", alignItems: "center" }}>
@@ -111,7 +205,7 @@ export default function ProfileView({ ranks }: { ranks: Rank[] }) {
                 ))}
               </div>
             )}
-            {!user.level_label && (
+            {!profile.level_label && (
               <div style={{ maxWidth: 420 }}>
                 <div className="flex" style={{ justifyContent: "space-between", marginBottom: 6 }}>
                   <span className="small muted">Progress to next level</span>
@@ -124,11 +218,7 @@ export default function ProfileView({ ranks }: { ranks: Rank[] }) {
                 </div>
               </div>
             )}
-            {!editing ? (
-              <p className="small muted" style={{ marginTop: 14, maxWidth: 480 }}>
-                {user.bio || "No bio yet."}
-              </p>
-            ) : (
+            {isOwn && editing ? (
               <div className="field" style={{ marginTop: 14, maxWidth: 480 }}>
                 <textarea
                   value={bio}
@@ -140,43 +230,63 @@ export default function ProfileView({ ranks }: { ranks: Rank[] }) {
                   {bio.length}/300
                 </div>
               </div>
+            ) : (
+              <p className="small muted" style={{ marginTop: 14, maxWidth: 480 }}>
+                {profile.bio || "No bio yet."}
+              </p>
             )}
           </div>
-          {!editing ? (
-            <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>
-              Edit Profile
-            </button>
+          {isOwn ? (
+            !editing ? (
+              <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>
+                Edit Profile
+              </button>
+            ) : (
+              <div className="flex gap8">
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setEditing(false);
+                    setUsername(profile.username);
+                    setBio(profile.bio ?? "");
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={saveBio}
+                  disabled={saving || !username.trim()}
+                >
+                  {saving ? <span className="spinner" /> : "Save"}
+                </button>
+              </div>
+            )
           ) : (
-            <div className="flex gap8">
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => {
-                  setEditing(false);
-                  setUsername(user.username);
-                  setBio(user.bio ?? "");
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={saveBio}
-                disabled={saving || !username.trim()}
-              >
-                {saving ? <span className="spinner" /> : "Save"}
-              </button>
-            </div>
+            <button
+              className={`btn btn-sm ${profile.is_following ? "btn-ghost" : "btn-primary"}`}
+              onClick={toggleFollow}
+              disabled={followBusy}
+            >
+              {followBusy ? (
+                <span className="spinner" />
+              ) : profile.is_following ? (
+                "Following"
+              ) : (
+                "+ Follow"
+              )}
+            </button>
           )}
         </div>
       </div>
 
       <div className="grid3 mb18">
         <div className="card stat-box">
-          <div className="stat-num">{user.approved_count}</div>
+          <div className="stat-num">{profile.approved_count}</div>
           <div className="stat-lbl">Approved Videos</div>
         </div>
         <div className="card stat-box">
-          <div className="stat-num">{user.rejected_count}</div>
+          <div className="stat-num">{profile.rejected_count}</div>
           <div className="stat-lbl">Rejected Videos</div>
         </div>
         <div className="card stat-box">
@@ -185,27 +295,72 @@ export default function ProfileView({ ranks }: { ranks: Rank[] }) {
         </div>
       </div>
 
-      <div className="section-title">
-        <span className="accent-bar" />
-        Recent Activity
-      </div>
-      <div className="card" style={{ padding: "6px 16px" }}>
-        {activity.length === 0 ? (
-          <div className="empty-state small">No submissions yet.</div>
-        ) : (
-          activity.map((s) => (
-            <div className="activity-item" key={s.id}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: 13.5 }}>{s.title}</div>
-                <div className="muted small">{new Date(s.created_at).toLocaleDateString()}</div>
-              </div>
-              <span className={`status-chip status-${s.status}`}>
-                {s.status[0].toUpperCase() + s.status.slice(1)}
-              </span>
+      {isOwn && (
+        <>
+          <div className="section-title">
+            <span className="accent-bar" />
+            Recent Activity
+          </div>
+          <div className="card" style={{ padding: "6px 16px" }}>
+            {activity.length === 0 ? (
+              <div className="empty-state small">No submissions yet.</div>
+            ) : (
+              activity.map((s) => (
+                <div className="activity-item" key={s.id}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13.5 }}>{s.title}</div>
+                    <div className="muted small">{new Date(s.created_at).toLocaleDateString()}</div>
+                  </div>
+                  <span className={`status-chip status-${s.status}`}>
+                    {s.status[0].toUpperCase() + s.status.slice(1)}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+
+      {listModal && (
+        <div className="modal-overlay" onClick={() => setListModal(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">
+              {listModal === "followers" ? "Followers" : "Following"}
             </div>
-          ))
-        )}
-      </div>
+            <div className="modal-sub">@{profile.username}</div>
+            {listLoading ? (
+              <div className="empty-state small">Loading…</div>
+            ) : listUsers.length === 0 ? (
+              <div className="empty-state small">
+                {listModal === "followers" ? "No followers yet." : "Not following anyone yet."}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {listUsers.map((u) => (
+                  <button
+                    key={u.id}
+                    className="lb-row"
+                    style={{ width: "100%", background: "none", textAlign: "left" }}
+                    onClick={() => {
+                      setListModal(null);
+                      onVisit?.(u.id);
+                    }}
+                  >
+                    <div className="avatar">{u.username.slice(0, 2).toUpperCase()}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13.5 }}>{u.username}</div>
+                      <div className="muted small">
+                        {u.level_label ? u.level_label : `Level ${u.level}`}
+                      </div>
+                    </div>
+                    <RoleBadge role={u.role} />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
