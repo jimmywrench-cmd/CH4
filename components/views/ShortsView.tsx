@@ -734,14 +734,24 @@ function CommentsPanel({
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   async function load() {
     setLoading(true);
+    setLoadError(false);
     try {
       const res = await fetch(`/api/feed/${video.id}/comments?sort=${sort}`);
+      if (!res.ok) {
+        setLoadError(true);
+        setComments([]);
+        return;
+      }
       const data = await res.json();
       setComments(data.comments ?? []);
       onCountChange((data.comments ?? []).length);
+    } catch {
+      setLoadError(true);
+      setComments([]);
     } finally {
       setLoading(false);
     }
@@ -812,6 +822,8 @@ function CommentsPanel({
         <div className="shorts-comments-list">
           {loading ? (
             <div className="empty-state small">Loading…</div>
+          ) : loadError ? (
+            <div className="empty-state small">Couldn't load comments. Try again.</div>
           ) : video.comments_disabled ? (
             <div className="empty-state small">Comments are disabled on this video.</div>
           ) : comments.length === 0 ? (

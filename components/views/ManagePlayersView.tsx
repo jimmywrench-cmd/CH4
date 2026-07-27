@@ -71,7 +71,6 @@ export default function ManagePlayersView({ ranks }: { ranks: Rank[] }) {
   const [pageSize, setPageSize] = useState(25);
 
   // row popovers / menus
-  const [hoverFor, setHoverFor] = useState<string | null>(null);
 
   // modals
   const [showRoleManager, setShowRoleManager] = useState(false);
@@ -674,11 +673,7 @@ export default function ManagePlayersView({ ranks }: { ranks: Rank[] }) {
                         <Checkbox checked={selected.has(u.id)} onClick={() => toggleOne(u.id)} />
                       </td>
                       <td>
-                        <div
-                          className="mp-user-cell"
-                          onMouseEnter={() => setHoverFor(u.id)}
-                          onMouseLeave={() => setHoverFor((h) => (h === u.id ? null : h))}
-                        >
+                        <div className="mp-user-cell">
                           <div className="mp-avatar-wrap">
                             <div className="avatar" style={{ width: 32, height: 32, fontSize: 11 }}>
                               {initials(u.username)}
@@ -693,40 +688,6 @@ export default function ManagePlayersView({ ranks }: { ranks: Rank[] }) {
                             </div>
                             <div className="mp-user-id">#{u.id.slice(0, 8)}</div>
                           </div>
-
-                          {hoverFor === u.id && (
-                            <div className="card popover mp-hover-card" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex gap8 mb10">
-                                <div className="avatar" style={{ width: 30, height: 30, fontSize: 11 }}>
-                                  {initials(u.username)}
-                                </div>
-                                <div>
-                                  <div style={{ fontWeight: 700, fontSize: 13 }}>{u.username}</div>
-                                  <RoleBadge role={u.role} />
-                                </div>
-                              </div>
-                              <div className="mp-hover-row">
-                                <span>Level</span>
-                                <b>{u.level_label ?? u.level}</b>
-                              </div>
-                              <div className="mp-hover-row">
-                                <span>Rank</span>
-                                <b>{displayRankName(ranks, u)}</b>
-                              </div>
-                              <div className="mp-hover-row">
-                                <span>Approved</span>
-                                <b>{u.approved_count}</b>
-                              </div>
-                              <div className="mp-hover-row">
-                                <span>Joined</span>
-                                <b>{new Date(u.created_at).toLocaleDateString()}</b>
-                              </div>
-                              <div className="mp-hover-row">
-                                <span>Last active</span>
-                                <b>{timeAgo(u.last_seen)}</b>
-                              </div>
-                            </div>
-                          )}
                         </div>
                       </td>
                       <td>
