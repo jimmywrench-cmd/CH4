@@ -7,6 +7,7 @@ import { Rank, rankForLevel, nextLevelInfo } from "@/lib/ranks";
 import RoleBadge from "../RoleBadge";
 import Insignia from "../Insignia";
 import CustomRoleBadge, { CustomRole } from "../CustomRoleBadge";
+import UploadShortModal from "../UploadShortModal";
 
 type PublicProfile = {
   id: string;
@@ -34,7 +35,7 @@ export default function ProfileView({
   viewedUserId?: string | null;
   onVisit?: (userId: string) => void;
 }) {
-  const { user: me, refresh } = useAuth();
+  const { user: me, refresh, can } = useAuth();
   const { toast } = useToast();
   const targetId = viewedUserId ?? me?.id ?? null;
   const isOwn = !!me && (!viewedUserId || viewedUserId === me.id);
@@ -51,6 +52,14 @@ export default function ProfileView({
   const [listModal, setListModal] = useState<null | "followers" | "following">(null);
   const [listUsers, setListUsers] = useState<any[]>([]);
   const [listLoading, setListLoading] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
+
+  function reloadActivity() {
+    if (!isOwn) return;
+    fetch(`/api/submissions?mine=1`)
+      .then((r) => r.json())
+      .then((d) => setActivity(d.submissions ?? []));
+  }
 
   useEffect(() => {
     if (!targetId) return;
@@ -68,11 +77,8 @@ export default function ProfileView({
     fetch(`/api/users/${targetId}/roles`)
       .then((r) => r.json())
       .then((d) => setCustomRoles(d.roles ?? []));
-    if (isOwn) {
-      fetch(`/api/submissions?mine=1`)
-        .then((r) => r.json())
-        .then((d) => setActivity(d.submissions ?? []));
-    }
+    reloadActivity();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetId, isOwn]);
 
   useEffect(() => {
@@ -144,6 +150,29 @@ export default function ProfileView({
     }
   }
 
+  async function editFollowerCount() {
+    if (!profile) return;
+    const raw = window.prompt("Set follower count:", String(profile.follower_count));
+    if (raw === null) return;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) {
+      toast("Follower count must be a non-negative number.");
+      return;
+    }
+    const res = await fetch(`/api/users/${profile.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ follower_count: Math.trunc(n) }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      toast(data.error || "Could not update follower count.");
+      return;
+    }
+    setProfile((p) => (p ? { ...p, follower_count: data.user.follower_count } : p));
+    toast("Follower count updated.");
+  }
+
   return (
     <div>
       <div className={`card mb18${isMaxLevel ? " profile-hero-max" : ""}`}>
@@ -189,10 +218,20 @@ export default function ProfileView({
               <span>·</span>
               <span>Joined {new Date(profile.created_at).toLocaleDateString()}</span>
             </div>
-            <div className="flex gap16 mb14" style={{ flexWrap: "wrap" }}>
+            <div className="flex gap16 mb14" style={{ flexWrap: "wrap", alignItems: "center" }}>
               <button className="follow-stat" onClick={() => openList("followers")}>
                 <b>{profile.follower_count}</b> <span className="muted">Followers</span>
               </button>
+              {can("edit_follower_counts") && (
+                <button
+                  className="icon-btn"
+                  title="Edit follower count"
+                  onClick={editFollowerCount}
+                  style={{ width: 26, height: 26 }}
+                >
+                  ✎
+                </button>
+              )}
               <button className="follow-stat" onClick={() => openList("following")}>
                 <b>{profile.following_count}</b> <span className="muted">Following</span>
               </button>
@@ -238,9 +277,14 @@ export default function ProfileView({
           </div>
           {isOwn ? (
             !editing ? (
-              <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>
-                Edit Profile
-              </button>
+              <div className="flex gap8">
+                <button className="btn btn-primary btn-sm" onClick={() => setUploadOpen(true)}>
+                  Upload a Short
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>
+                  Edit Profile
+                </button>
+              </div>
             ) : (
               <div className="flex gap8">
                 <button
@@ -360,6 +404,10 @@ export default function ProfileView({
             )}
           </div>
         </div>
+      )}
+
+      {uploadOpen && (
+        <UploadShortModal onClose={() => setUploadOpen(false)} onUploaded={reloadActivity} />
       )}
     </div>
   );

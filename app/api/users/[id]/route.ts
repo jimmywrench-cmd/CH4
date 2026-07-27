@@ -24,7 +24,7 @@ export async function GET(
 
   const profile = await queryOne(
     `select id, username, role, level, level_label, bio, avatar_seed,
-            approved_count, rejected_count, created_at
+            approved_count, rejected_count, created_at, follower_offset
      from users where id = $1`,
     [id]
   );
@@ -41,6 +41,8 @@ export async function GET(
     ),
   ]);
 
+  const { follower_offset, ...publicProfile } = profile as any;
+
   const viewer = await getCurrentUser();
   let isFollowing = false;
   if (viewer && viewer.id !== id) {
@@ -53,8 +55,8 @@ export async function GET(
 
   return NextResponse.json({
     user: {
-      ...profile,
-      follower_count: Number(followerCount?.count ?? 0),
+      ...publicProfile,
+      follower_count: Math.max(0, Number(followerCount?.count ?? 0) + Number(follower_offset ?? 0)),
       following_count: Number(followingCount?.count ?? 0),
       is_following: isFollowing,
       is_self: viewer?.id === id,
@@ -79,6 +81,7 @@ export async function PATCH(
     role?: (typeof ROLES)[number];
     suspended?: boolean;
     banned?: boolean;
+    follower_count?: number;
   };
   try {
     body = await req.json();
@@ -90,7 +93,8 @@ export async function PATCH(
     body.level !== undefined ||
     body.role !== undefined ||
     body.suspended !== undefined ||
-    body.banned !== undefined;
+    body.banned !== undefined ||
+    body.follower_count !== undefined;
 
   if (wantsAdminField) {
     const guarded = await requireUser();
@@ -170,6 +174,24 @@ export async function PATCH(
       values.push(!!body.banned);
       sets.push(`banned = $${values.length}`);
     }
+    if (body.follower_count !== undefined) {
+      if (!(await hasPermission(guarded.user, "edit_follower_counts"))) {
+        return NextResponse.json(
+          { error: "You don't have permission to change follower counts." },
+          { status: 403 }
+        );
+      }
+      const target = Math.trunc(Number(body.follower_count));
+      if (!Number.isFinite(target) || target < 0) {
+        return NextResponse.json({ error: "Invalid follower count." }, { status: 400 });
+      }
+      const real = await queryOne<{ count: string }>(
+        `select count(*)::text as count from follows where following_id = $1`,
+        [id]
+      );
+      values.push(target - Number(real?.count ?? 0));
+      sets.push(`follower_offset = $${values.length}`);
+    }
 
     if (!sets.length) {
       return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
@@ -178,7 +200,8 @@ export async function PATCH(
     values.push(id);
     const rows = await query(
       `update users set ${sets.join(", ")} where id = $${values.length}
-       returning id, username, role, level, level_label, suspended, banned`,
+       returning id, username, role, level, level_label, suspended, banned,
+         (select greatest(0, count(*)::int + users.follower_offset) from follows where following_id = users.id) as follower_count`,
       values
     );
     if (!rows[0]) return NextResponse.json({ error: "User not found." }, { status: 404 });

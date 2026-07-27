@@ -53,6 +53,8 @@ export const PERMISSIONS = [
   "export_data",
   "access_beta_tools",
   "manage_shorts",
+  "edit_video_stats",
+  "edit_follower_counts",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -91,6 +93,8 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   export_data: "Export data",
   access_beta_tools: "Access beta tools",
   manage_shorts: "Moderate Shorts (feature/pin/hide/remove, comments)",
+  edit_video_stats: "Edit video stats (views/likes/dislikes)",
+  edit_follower_counts: "Edit follower counts",
 };
 
 export type PermissionMatrix = Record<Status, Record<Permission, boolean>>;
@@ -123,6 +127,8 @@ const ADMIN_OFF: Permission[] = [
   "change_user_statuses",
   "edit_status_permissions",
   "manage_rank_requirements",
+  "edit_video_stats",
+  "edit_follower_counts",
   ...ROOM_OWNER_ONLY,
 ];
 

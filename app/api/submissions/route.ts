@@ -6,11 +6,14 @@ import { createSignedPlaybackUrl } from "@/lib/storage";
 // GET /api/submissions?status=pending  (staff sees queue; anyone can filter their own via ?mine=1)
 // GET /api/submissions?user_id=<id>    (staff only, unless it's your own id — powers the
 //   "Approved Videos" / "View Submitted Videos" panels on the Manage Players page)
+// GET /api/submissions?source=review   (defaults to all sources — pass this to only see
+//   clips that went through the accept/deny queue, excluding directly-uploaded Shorts)
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
   const mine = searchParams.get("mine");
   const userId = searchParams.get("user_id");
+  const source = searchParams.get("source");
 
   const guarded = await requireUser();
   if ("error" in guarded) return guarded.error;
@@ -35,11 +38,15 @@ export async function GET(req: NextRequest) {
     params.push(userId);
     conditions.push(`s.user_id = $${params.length}`);
   }
+  if (source) {
+    params.push(source);
+    conditions.push(`s.source = $${params.length}`);
+  }
 
   const where = conditions.length ? `where ${conditions.join(" and ")}` : "";
 
   const rows = await query(
-    `select s.id, s.title, s.description, s.video_path, s.status, s.level_at_submit,
+    `select s.id, s.title, s.description, s.video_path, s.status, s.level_at_submit, s.source,
             s.created_at, s.reviewed_at,
             u.id as user_id, u.username, u.level as current_level
      from submissions s
@@ -87,9 +94,9 @@ export async function POST(req: NextRequest) {
   }
 
   const rows = await query(
-    `insert into submissions (user_id, title, description, video_path, level_at_submit)
-     values ($1, $2, $3, $4, $5)
-     returning id, title, description, video_path, status, level_at_submit, created_at`,
+    `insert into submissions (user_id, title, description, video_path, level_at_submit, source)
+     values ($1, $2, $3, $4, $5, 'review')
+     returning id, title, description, video_path, status, level_at_submit, created_at, source`,
     [guarded.user.id, title, description, body.video_path, guarded.user.level]
   );
 

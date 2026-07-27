@@ -22,7 +22,7 @@ export default function HomeView({
       const [uRes, aRes, sRes] = await Promise.all([
         fetch("/api/leaderboard?tab=level"),
         fetch("/api/announcements"),
-        fetch("/api/submissions?status=approved"),
+        fetch("/api/submissions?status=approved&source=review"),
       ]);
       const [uData, aData, sData] = await Promise.all([uRes.json(), aRes.json(), sRes.json()]);
       setUsers(uData.users ?? []);

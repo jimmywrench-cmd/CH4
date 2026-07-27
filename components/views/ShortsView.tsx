@@ -364,6 +364,33 @@ export default function ShortsView({
     }
   }
 
+  async function editStats(v: Video) {
+    const viewsRaw = window.prompt("Set view count:", String(v.view_count));
+    if (viewsRaw === null) return;
+    const likesRaw = window.prompt("Set like count:", String(v.likes));
+    if (likesRaw === null) return;
+    const dislikesRaw = window.prompt("Set dislike count:", String(v.dislikes));
+    if (dislikesRaw === null) return;
+
+    const view_count = Number(viewsRaw);
+    const likes = Number(likesRaw);
+    const dislikes = Number(dislikesRaw);
+    if ([view_count, likes, dislikes].some((n) => !Number.isFinite(n) || n < 0)) {
+      toast("Stats must be non-negative numbers.");
+      return;
+    }
+
+    const res = await fetch(`/api/feed/${v.id}/stats`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ view_count, likes, dislikes }),
+    });
+    const data = await res.json();
+    if (!res.ok) return toast(data.error || "Could not update stats.");
+    setVideos((list) => list.map((x) => (x.id === v.id ? { ...x, ...data.video } : x)));
+    toast("Stats updated.");
+  }
+
   if (loading) {
     return (
       <div className="empty-state">
@@ -438,6 +465,8 @@ export default function ShortsView({
             onFullscreen={toggleFullscreen}
             canModerate={can("manage_shorts")}
             onModerate={(action) => moderate(v, action)}
+            canEditStats={can("edit_video_stats")}
+            onEditStats={() => editStats(v)}
             onVisit={onVisit}
             onToggleFollow={() => toggleFollow(v)}
             isSelf={v.user_id === user?.id}
@@ -543,6 +572,8 @@ function ShortsCard({
   onFullscreen,
   canModerate,
   onModerate,
+  canEditStats,
+  onEditStats,
   onVisit,
   onToggleFollow,
   isSelf,
@@ -566,6 +597,8 @@ function ShortsCard({
   onFullscreen: () => void;
   canModerate: boolean;
   onModerate: (action: string) => void;
+  canEditStats: boolean;
+  onEditStats: () => void;
   onVisit?: (userId: string) => void;
   onToggleFollow: () => void;
   isSelf: boolean;
@@ -671,35 +704,42 @@ function ShortsCard({
         >
           <span className="shorts-act-icon">📋</span>
         </button>
-        {canModerate && (
+        {(canModerate || canEditStats) && (
           <div style={{ position: "relative" }}>
             <button className="shorts-act" onClick={() => setModOpen((o) => !o)}>
               <span className="shorts-act-icon">⚙️</span>
             </button>
             {modOpen && (
               <div className="shorts-mod-menu">
-                <button onClick={() => onModerate(video.featured ? "unfeature" : "feature")}>
-                  {video.featured ? "Unfeature" : "Feature"}
-                </button>
-                <button onClick={() => onModerate(video.pinned ? "unpin" : "pin")}>
-                  {video.pinned ? "Unpin" : "Pin"}
-                </button>
-                <button onClick={() => onModerate("hide")}>Hide</button>
-                <button
-                  onClick={() =>
-                    onModerate(video.comments_disabled ? "enable_comments" : "disable_comments")
-                  }
-                >
-                  {video.comments_disabled ? "Enable comments" : "Disable comments"}
-                </button>
-                <button
-                  className="danger"
-                  onClick={() => {
-                    if (confirm("Permanently remove this video?")) onModerate("remove");
-                  }}
-                >
-                  Remove
-                </button>
+                {canModerate && (
+                  <>
+                    <button onClick={() => onModerate(video.featured ? "unfeature" : "feature")}>
+                      {video.featured ? "Unfeature" : "Feature"}
+                    </button>
+                    <button onClick={() => onModerate(video.pinned ? "unpin" : "pin")}>
+                      {video.pinned ? "Unpin" : "Pin"}
+                    </button>
+                    <button onClick={() => onModerate("hide")}>Hide</button>
+                    <button
+                      onClick={() =>
+                        onModerate(video.comments_disabled ? "enable_comments" : "disable_comments")
+                      }
+                    >
+                      {video.comments_disabled ? "Enable comments" : "Disable comments"}
+                    </button>
+                  </>
+                )}
+                {canEditStats && <button onClick={onEditStats}>Edit stats…</button>}
+                {canModerate && (
+                  <button
+                    className="danger"
+                    onClick={() => {
+                      if (confirm("Permanently remove this video?")) onModerate("remove");
+                    }}
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
             )}
           </div>

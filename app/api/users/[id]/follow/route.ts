@@ -30,7 +30,8 @@ export async function POST(
   );
 
   const followerCount = await queryOne<{ count: string }>(
-    `select count(*)::text as count from follows where following_id = $1`,
+    `select greatest(0, (select count(*) from follows where following_id = $1)
+       + (select follower_offset from users where id = $1))::text as count`,
     [id]
   );
 
@@ -55,7 +56,8 @@ export async function DELETE(
   );
 
   const followerCount = await queryOne<{ count: string }>(
-    `select count(*)::text as count from follows where following_id = $1`,
+    `select greatest(0, (select count(*) from follows where following_id = $1)
+       + (select follower_offset from users where id = $1))::text as count`,
     [id]
   );
 

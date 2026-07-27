@@ -42,6 +42,9 @@ const PERMISSION_LABELS: Record<string, string> = {
   view_analytics: "View analytics",
   export_data: "Export data",
   access_beta_tools: "Access beta tools",
+  manage_shorts: "Moderate Shorts",
+  edit_video_stats: "Edit video stats (views/likes/dislikes)",
+  edit_follower_counts: "Edit follower counts",
 };
 
 type Matrix = Record<string, Record<string, boolean>>;
