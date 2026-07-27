@@ -52,6 +52,7 @@ export const PERMISSIONS = [
   "view_analytics",
   "export_data",
   "access_beta_tools",
+  "manage_shorts",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -89,6 +90,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   view_analytics: "View analytics",
   export_data: "Export data",
   access_beta_tools: "Access beta tools",
+  manage_shorts: "Moderate Shorts (feature/pin/hide/remove, comments)",
 };
 
 export type PermissionMatrix = Record<Status, Record<Permission, boolean>>;
