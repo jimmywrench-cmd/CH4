@@ -438,6 +438,61 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; hei
 .channel-item-row .channel-item{flex:1;}
 .channel-item-row.active .channel-item{background:rgba(255,255,255,.09); color:var(--text); font-weight:600;}
 
+/* chat: Discord-style 3-column layout (channels | messages | members) */
+.chat-wrap-discord{grid-template-columns:220px 1fr 220px;}
+.chat-wrap-discord.members-hidden{grid-template-columns:220px 1fr;}
+@media (max-width:1180px){.chat-wrap-discord{grid-template-columns:200px 1fr;}}
+@media (max-width:980px){.chat-wrap-discord, .chat-wrap-discord.members-hidden{grid-template-columns:1fr; height:auto;}}
+
+.chat-convo-row{display:flex; align-items:center; gap:2px;}
+.chat-convo-row .chat-convo-item{flex:1;}
+.chat-convo-delete{
+  width:22px; height:22px; flex-shrink:0; border-radius:6px; background:none; color:var(--muted2);
+  font-size:11px; display:none; align-items:center; justify-content:center; opacity:.8;
+}
+.chat-convo-row:hover .chat-convo-delete{display:flex;}
+.chat-convo-delete:hover{background:rgba(255,90,90,.14); color:var(--red);}
+
+.chat-head{position:relative;}
+.chat-head-actions{display:flex; gap:6px; margin-left:auto;}
+.chat-head-btn{
+  display:flex; align-items:center; gap:4px; padding:5px 9px; border-radius:8px; background:var(--glass);
+  border:1px solid var(--border); color:var(--muted); font-size:12px;
+}
+.chat-head-btn:hover{color:var(--text); border-color:var(--border-hi);}
+.chat-head-btn.active{color:var(--text); border-color:rgba(255,201,77,.4); background:rgba(255,201,77,.08);}
+
+.chat-pin-list{display:flex; flex-direction:column; max-height:160px; overflow-y:auto;}
+.chat-pin-list .chat-pin{border-bottom:1px solid rgba(255,201,77,.12);}
+.chat-pin-list .chat-pin:last-child{border-bottom:1px solid rgba(255,201,77,.2);}
+
+/* message grouping — consecutive messages from the same author
+   collapse to a hover-revealed timestamp instead of a repeated
+   avatar/name/badge row. */
+.msg-time-gutter{
+  width:32px; flex-shrink:0; font-size:10px; color:var(--muted2); opacity:0; text-align:center;
+  padding-top:3px; transition:.12s;
+}
+.msg:hover .msg-time-gutter{opacity:1;}
+.msg-grouped{padding-top:0; padding-bottom:0;}
+.msg-pin-flag{font-size:10.5px; color:var(--yellow);}
+.msg-pinned{background:rgba(255,201,77,.05); box-shadow:inset 2px 0 0 rgba(255,201,77,.35);}
+
+/* member list panel */
+.chat-members{padding:16px 10px; overflow-y:auto; display:flex; flex-direction:column; gap:14px;}
+.chat-members-head{
+  padding:2px 8px 4px; font-size:10.5px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase;
+  color:var(--muted2);
+}
+.member-group{display:flex; flex-direction:column; gap:1px;}
+.member-group-head{
+  padding:6px 8px 4px; font-size:10px; font-weight:700; letter-spacing:.8px; text-transform:uppercase;
+  color:var(--muted2);
+}
+.member-row{display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:8px; transition:.12s;}
+.member-row:hover{background:var(--glass);}
+.member-name{font-size:12.5px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
 /* modal */
 .modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,.65); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; z-index:100; padding:20px;}
 .modal-card{width:100%; max-width:380px; max-height:85vh; overflow-y:auto; padding:22px; background:linear-gradient(180deg, rgba(24,24,26,.96), rgba(8,8,8,.98)); border:1px solid var(--border-hi); box-shadow:0 20px 80px rgba(0,0,0,.7);}
