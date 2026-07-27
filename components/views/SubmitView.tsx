@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/client/AuthContext";
 import { useToast } from "../Toast";
-import { Rank, rankForLevel, rankBounds } from "@/lib/ranks";
+import { Rank, rankBounds } from "@/lib/ranks";
 
 export default function SubmitView({ ranks }: { ranks: Rank[] }) {
   const { user } = useAuth();
@@ -20,11 +20,22 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
   const [trimEnd, setTrimEnd] = useState(62);
   const [submitting, setSubmitting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!file) {
+      setVideoUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setVideoUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   if (!user) return null;
 
-  const rank = rankForLevel(ranks, user.level);
-  const ready = !!(videoPath && !submitting);
+  const ready = !!(videoPath && ruleBreaker.trim() && !submitting);
   const durationSec = (((trimEnd - trimStart) / 100) * 30).toFixed(1); // assumes ~30s source, visual only
 
   async function handleFile(f: File) {
@@ -103,6 +114,14 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
 
   const bounds = rankBounds(ranks);
 
+  function dragTrimHandle(e: React.PointerEvent, which: "start" | "end") {
+    const rect = timelineRef.current?.getBoundingClientRect();
+    if (!rect || !rect.width) return;
+    const pct = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
+    if (which === "start") setTrimStart(Math.min(pct, trimEnd - 1));
+    else setTrimEnd(Math.max(pct, trimStart + 1));
+  }
+
   return (
     <div>
       <div className="section-title">
@@ -112,12 +131,12 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
       <div className="grid2">
         <div className="card" style={{ padding: 26 }}>
           <div className="field">
-            <label>Rule Breaker&apos;s Name</label>
+            <label>Rule Breaker&apos;s Name *</label>
             <input
               type="text"
               value={ruleBreaker}
               onChange={(e) => setRuleBreaker(e.target.value)}
-              placeholder="Who broke the rule? (optional)"
+              placeholder="Who broke the rule?"
               maxLength={40}
             />
           </div>
@@ -129,17 +148,6 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
               placeholder="What happens in the clip? (optional)"
             />
           </div>
-          <div className="grid3" style={{ gridTemplateColumns: "1fr 1fr" }}>
-            <div className="field">
-              <label>Current Level</label>
-              <div className="field-locked">🔒 {user.level_label ?? `Level ${user.level}`}</div>
-            </div>
-            <div className="field">
-              <label>Current Rank</label>
-              <div className="field-locked">🔒 {user.level_label ? "—" : rank.name}</div>
-            </div>
-          </div>
-
           <div className="field">
             <label>Video Upload</label>
             <div
@@ -202,10 +210,10 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
                 be rejected.
               </div>
               <div className="trimmer">
-                <div className="trim-preview" id="trimPreview">
-                  ▶ {file.name}
-                </div>
-                <div className="trim-timeline">
+                {videoUrl && (
+                  <video src={videoUrl} controls playsInline className="trim-video" />
+                )}
+                <div className="trim-timeline" ref={timelineRef}>
                   <div className="trim-thumbs">
                     {Array.from({ length: 6 }).map((_, i) => (
                       <div key={i} />
@@ -214,50 +222,26 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
                   <div
                     className="trim-select"
                     style={{ left: `${trimStart}%`, right: `${100 - trimEnd}%` }}
-                  />
-                </div>
-                <div className="flex gap12 mb14">
-                  <span className="small muted" style={{ width: 30 }}>
-                    Start
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={trimStart}
-                    onChange={(e) => setTrimStart(Math.min(Number(e.target.value), trimEnd - 1))}
-                  />
-                </div>
-                <div className="flex gap12">
-                  <span className="small muted" style={{ width: 30 }}>
-                    End
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={trimEnd}
-                    onChange={(e) => setTrimEnd(Math.max(Number(e.target.value), trimStart + 1))}
-                  />
-                </div>
-                <div className="trim-controls" style={{ marginTop: 16 }}>
-                  <div className="flex gap10">
-                    <span className="trim-info mono">Clip duration: ~{durationSec}s</span>
+                  >
+                    <div
+                      className="trim-handle trim-handle-start"
+                      onPointerDown={(e) => (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)}
+                      onPointerMove={(e) => {
+                        if (e.buttons === 1) dragTrimHandle(e, "start");
+                      }}
+                    />
+                    <div
+                      className="trim-handle trim-handle-end"
+                      onPointerDown={(e) => (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)}
+                      onPointerMove={(e) => {
+                        if (e.buttons === 1) dragTrimHandle(e, "end");
+                      }}
+                    />
                   </div>
-                  <div className="flex gap8">
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => setTrimEnd((v) => Math.max(trimStart + 1, v - 1))}
-                    >
-                      ⏮ frame
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => setTrimEnd((v) => Math.min(100, v + 1))}
-                    >
-                      frame ⏭
-                    </button>
-                  </div>
+                </div>
+                <div className="trim-controls" style={{ marginTop: 4 }}>
+                  <span className="trim-info mono">Clip duration: ~{durationSec}s</span>
+                  <span className="small muted">Drag the handles to trim the clip</span>
                 </div>
               </div>
             </>

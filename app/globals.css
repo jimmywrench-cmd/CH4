@@ -381,12 +381,17 @@ kbd{
 .dropzone{
   border:2px dashed var(--border); border-radius:20px; padding:44px 24px; text-align:center; transition:.2s; cursor:pointer;
   background:rgba(255,255,255,.02);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
 }
 .dropzone:hover, .dropzone.drag{border-color:var(--border-hi); background:rgba(255,255,255,.05);}
 .dropzone svg{width:34px; height:34px; color:var(--purple2); margin-bottom:10px;}
 
 /* trimmer */
 .trimmer{background:rgba(0,0,0,.35); border:1px solid var(--border); border-radius:18px; padding:20px; margin-top:16px;}
+.trim-video{
+  width:100%; aspect-ratio:16/9; background:#000; border-radius:14px; margin-bottom:16px;
+  display:block; object-fit:contain;
+}
 .trim-preview{
   aspect-ratio:16/9; background:linear-gradient(135deg,#111,#1c1424); border-radius:14px; margin-bottom:16px;
   display:flex; align-items:center; justify-content:center; color:var(--muted2); font-size:13px; position:relative; overflow:hidden;
@@ -395,6 +400,13 @@ kbd{
 .trim-thumbs{position:absolute; inset:0; display:flex;}
 .trim-thumbs div{flex:1; background:repeating-linear-gradient(90deg, rgba(255,255,255,.04) 0 1px, transparent 1px 40px);}
 .trim-select{position:absolute; top:0; bottom:0; background:linear-gradient(90deg, rgba(255,255,255,.22), rgba(255,255,255,.1)); border-left:3px solid var(--blue2); border-right:3px solid var(--purple2);}
+.trim-handle{
+  position:absolute; top:0; bottom:0; width:16px; cursor:ew-resize; touch-action:none;
+  display:flex; align-items:center; justify-content:center;
+}
+.trim-handle::after{content:''; width:3px; height:22px; border-radius:2px; background:#fff; opacity:.85;}
+.trim-handle-start{left:-8px;}
+.trim-handle-end{right:-8px;}
 .trim-controls{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;}
 .trim-info{font-size:12px; color:var(--muted);}
 .playbtn{width:36px; height:36px; border-radius:50%; background:var(--glass); border:1px solid var(--border); display:flex; align-items:center; justify-content:center;}
