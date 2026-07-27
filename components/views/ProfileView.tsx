@@ -39,6 +39,7 @@ export default function ProfileView({ ranks }: { ranks: Rank[] }) {
   const { levelsInRank, posInRank } = nextLevelInfo(ranks, user.level);
   const pct = levelsInRank ? Math.min(100, (posInRank / levelsInRank) * 100) : 100;
   const total = user.approved_count + user.rejected_count;
+  const isMaxLevel = !levelsInRank && !user.level_label;
 
   async function saveBio() {
     setSaving(true);
@@ -63,9 +64,11 @@ export default function ProfileView({ ranks }: { ranks: Rank[] }) {
 
   return (
     <div>
-      <div className="card mb18">
+      <div className={`card mb18${isMaxLevel ? " profile-hero-max" : ""}`}>
         <div className="profile-hero">
-          <Insignia ranks={ranks} level={user.level} size={72} />
+          <div className={isMaxLevel ? "insignia-prestige" : undefined}>
+            <Insignia ranks={ranks} level={user.level} size={72} />
+          </div>
           <div style={{ flex: 1, minWidth: 220 }}>
             <div className="profile-name-row mb10">
               {!editing ? (
@@ -89,6 +92,7 @@ export default function ProfileView({ ranks }: { ranks: Rank[] }) {
                 />
               )}
               <RoleBadge role={user.role} />
+              {isMaxLevel && <span className="max-level-badge">👑 MAX LEVEL</span>}
             </div>
             <div className="flex gap16 muted small mb14" style={{ flexWrap: "wrap" }}>
               {user.level_label ? (

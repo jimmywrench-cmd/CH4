@@ -118,6 +118,8 @@ export default function AppShell() {
   const seenNotifIds = useRef<Set<number> | null>(null);
   const viewRef = useRef(view);
   viewRef.current = view;
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [scrolled, setScrolled] = useState(false);
 
   useAnnouncements((a) => {
     playAnnouncementChime();
@@ -161,6 +163,26 @@ export default function AppShell() {
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  useEffect(() => {
+    const main = document.querySelector(".main");
+    function onScroll() {
+      setScrolled((main?.scrollTop ?? window.scrollY) > 4);
+    }
+    (main ?? window).addEventListener("scroll", onScroll);
+    return () => (main ?? window).removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    function onKeydown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeydown);
+    return () => document.removeEventListener("keydown", onKeydown);
   }, []);
 
   async function markAllRead() {
@@ -260,7 +282,7 @@ export default function AppShell() {
 
       {/* MAIN */}
       <div className="main">
-        <div className="topbar">
+        <div className={`topbar${scrolled ? " is-scrolled" : ""}`}>
           <button
             className="icon-btn menu-toggle"
             onClick={() => setSidebarOpen((o) => !o)}
@@ -275,6 +297,7 @@ export default function AppShell() {
               <path d="M21 21l-4-4" />
             </svg>
             <input
+              ref={searchRef}
               placeholder="Search by username, level, rank, role…"
               value={search}
               onChange={(e) => {
@@ -282,6 +305,12 @@ export default function AppShell() {
                 setView(e.target.value.trim() ? "search" : "home");
               }}
             />
+            {!search && (
+              <span className="search-kbd">
+                <kbd>Ctrl</kbd>
+                <kbd>K</kbd>
+              </span>
+            )}
           </div>
           <div className="topbar-right">
             <div style={{ position: "relative" }} ref={notifRef}>
