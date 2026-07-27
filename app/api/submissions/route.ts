@@ -4,13 +4,21 @@ import { requireUser, requireStaff } from "@/lib/guard";
 import { createSignedPlaybackUrl } from "@/lib/storage";
 
 // GET /api/submissions?status=pending  (staff sees queue; anyone can filter their own via ?mine=1)
+// GET /api/submissions?user_id=<id>    (staff only, unless it's your own id — powers the
+//   "Approved Videos" / "View Submitted Videos" panels on the Manage Players page)
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
   const mine = searchParams.get("mine");
+  const userId = searchParams.get("user_id");
 
   const guarded = await requireUser();
   if ("error" in guarded) return guarded.error;
+
+  if (userId && userId !== guarded.user.id) {
+    const staffGuarded = await requireStaff();
+    if ("error" in staffGuarded) return staffGuarded.error;
+  }
 
   const conditions: string[] = [];
   const params: any[] = [];
@@ -21,6 +29,10 @@ export async function GET(req: NextRequest) {
   }
   if (mine) {
     params.push(guarded.user.id);
+    conditions.push(`s.user_id = $${params.length}`);
+  }
+  if (userId) {
+    params.push(userId);
     conditions.push(`s.user_id = $${params.length}`);
   }
 

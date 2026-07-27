@@ -8,7 +8,7 @@ export async function GET() {
 
   const rows = await query(
     `select u.id, u.username, u.role, u.level, u.level_label, u.approved_count, u.rejected_count,
-            u.suspended, u.banned, u.created_at,
+            u.suspended, u.banned, u.created_at, u.last_seen,
             coalesce(
               (select json_agg(
                  json_build_object(

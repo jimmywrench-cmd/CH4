@@ -602,3 +602,178 @@ tbody tr:hover td{background:rgba(255,255,255,.02);}
 .donate-perk-icon{font-size:16px; flex-shrink:0;}
 .donate-perk-text{font-size:12px; color:var(--muted); line-height:1.5;}
 .donate-cta{width:100%; justify-content:center; padding:13px; font-size:14px;}
+
+/* ============================================================
+   Manage Players — admin dashboard redesign
+   ============================================================ */
+
+.mp-stats{display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-bottom:18px;}
+@media (max-width:1200px){.mp-stats{grid-template-columns:repeat(3,1fr);}}
+@media (max-width:640px){.mp-stats{grid-template-columns:repeat(2,1fr);}}
+.mp-stat{padding:14px 16px; transition:.18s;}
+.mp-stat:hover{transform:translateY(-2px);}
+.mp-stat-num{font-family:'Chakra Petch',sans-serif; font-size:22px; font-weight:700; line-height:1.1;}
+.mp-stat-lbl{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; margin-top:6px;}
+.mp-stat-icon{width:30px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center; background:var(--glass); border:1px solid var(--border); margin-bottom:10px; font-size:14px;}
+
+.mp-toolbar{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:12px 14px; margin-bottom:16px;
+}
+.mp-search{
+  display:flex; align-items:center; gap:8px; background:rgba(255,255,255,.05);
+  border:1px solid var(--border); border-radius:12px; padding:8px 12px; flex:1; min-width:180px;
+}
+.mp-search input{background:none; border:none; outline:none; color:var(--text); font-size:13px; width:100%;}
+.mp-search svg{width:14px; height:14px; opacity:.6; flex-shrink:0;}
+.mp-select{
+  background:rgba(255,255,255,.05); border:1px solid var(--border); border-radius:10px;
+  padding:8px 10px; color:var(--text); font-size:12.5px; outline:none; transition:.15s; cursor:pointer;
+}
+.mp-select:hover, .mp-select:focus{border-color:var(--border-hi);}
+.mp-select option{background:#0c0c0e; color:var(--text);}
+.mp-toolbar-divider{width:1px; align-self:stretch; background:var(--border); margin:0 2px;}
+
+.mp-bulkbar{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:10px 14px; margin-bottom:12px;
+  border:1px solid rgba(255,255,255,.22);
+  background:rgba(255,255,255,.06);
+  animation:mpSlideDown .18s ease;
+}
+.mp-bulkbar-count{font-size:12.5px; font-weight:700; margin-right:2px;}
+@keyframes mpSlideDown{from{opacity:0; transform:translateY(-6px);} to{opacity:1; transform:translateY(0);}}
+
+.mp-table-scroll{
+  overflow-x:auto; max-height:calc(100vh - 340px); min-height:220px; overflow-y:auto;
+  border-radius:var(--r-lg);
+}
+.mp-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13px; min-width:920px;}
+.mp-table thead th{
+  position:sticky; top:0; z-index:5;
+  background:rgba(12,12,14,.97); backdrop-filter:blur(10px);
+  text-align:left; padding:11px 12px; color:var(--muted); font-weight:600; font-size:10.5px;
+  text-transform:uppercase; letter-spacing:.6px; border-bottom:1px solid var(--border-hi);
+  white-space:nowrap;
+}
+.mp-table th.sortable{cursor:pointer; user-select:none;}
+.mp-table th.sortable:hover{color:var(--text);}
+.mp-sort-arrow{margin-left:4px; opacity:.7; font-size:9px;}
+.mp-table td{padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:middle;}
+.mp-table tbody tr{animation:mpRowIn .28s ease both; transition:background .15s;}
+.mp-table tbody tr:hover td{background:rgba(255,255,255,.03);}
+.mp-table tbody tr.selected td{background:rgba(255,255,255,.05);}
+@keyframes mpRowIn{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+
+.mp-checkbox{
+  width:16px; height:16px; border-radius:5px; border:1px solid var(--border-hi);
+  background:rgba(255,255,255,.03); display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:.15s; flex-shrink:0;
+}
+.mp-checkbox:hover{border-color:#fff;}
+.mp-checkbox.checked{background:linear-gradient(135deg,var(--ember2),var(--purple2)); border-color:transparent;}
+.mp-checkbox.checked svg{width:10px; height:10px; color:#0a0a0a;}
+.mp-checkbox.indeterminate{background:rgba(255,255,255,.25);}
+
+.mp-user-cell{display:flex; align-items:center; gap:10px; position:relative;}
+.mp-avatar-wrap{position:relative; flex-shrink:0;}
+.mp-online-dot{
+  position:absolute; bottom:-1px; right:-1px; width:9px; height:9px; border-radius:50%;
+  border:2px solid #0a0a0a; background:var(--muted2);
+}
+.mp-online-dot.online{background:var(--green); box-shadow:0 0 6px var(--green);}
+.mp-user-name{font-weight:600; font-size:13px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+.mp-user-id{font-size:10px; color:var(--muted2); font-family:'JetBrains Mono',monospace;}
+.mp-user-meta{font-size:10.5px; color:var(--muted2); margin-top:2px;}
+
+.mp-hover-card{
+  position:absolute; z-index:60; top:calc(100% + 8px); left:0; width:250px;
+  padding:16px; animation:mpPopIn .14s ease;
+}
+@keyframes mpPopIn{from{opacity:0; transform:translateY(-4px) scale(.98);} to{opacity:1; transform:translateY(0) scale(1);}}
+.mp-hover-row{display:flex; justify-content:space-between; font-size:11.5px; padding:4px 0; color:var(--muted);}
+.mp-hover-row b{color:var(--text); font-weight:600;}
+
+.mp-level-cell{min-width:150px;}
+.mp-level-top{display:flex; align-items:baseline; gap:6px; margin-bottom:5px;}
+.mp-level-num{font-family:'Chakra Petch',sans-serif; font-weight:700; font-size:14px;}
+.mp-level-rank{font-size:10.5px; color:var(--muted);}
+.mp-xp-track{height:5px; border-radius:999px; background:rgba(255,255,255,.06); overflow:hidden;}
+.mp-xp-fill{height:100%; border-radius:999px; background:linear-gradient(90deg,var(--blue2),var(--purple2)); transition:width .4s ease;}
+
+.mp-roles-cell{display:flex; align-items:center; gap:6px; flex-wrap:wrap; max-width:220px;}
+.mp-roles-more{font-size:10.5px; color:var(--muted); background:var(--glass); border:1px solid var(--border); border-radius:8px; padding:1px 7px;}
+.mp-edit-roles-btn{
+  font-size:10.5px; color:var(--muted); background:none; border:1px dashed var(--border-hi);
+  border-radius:8px; padding:2px 8px; transition:.15s; white-space:nowrap;
+}
+.mp-edit-roles-btn:hover{color:var(--text); border-color:#fff; background:var(--glass);}
+
+.mp-approved-btn{
+  font-family:'JetBrains Mono',monospace; font-weight:700; font-size:13px; color:var(--text);
+  background:rgba(51,214,138,.1); border:1px solid rgba(51,214,138,.25); border-radius:8px;
+  padding:4px 10px; transition:.15s;
+}
+.mp-approved-btn:hover{background:rgba(51,214,138,.2); border-color:rgba(51,214,138,.5);}
+
+.mp-status-badge{
+  display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700;
+  padding:3px 9px 3px 7px; border-radius:7px; letter-spacing:.3px; text-transform:uppercase; white-space:nowrap;
+  transition:.15s;
+}
+.mp-status-dot{width:6px; height:6px; border-radius:50%; flex-shrink:0;}
+.mp-flag-pill{font-size:10px; font-weight:700; padding:2px 7px; border-radius:7px; white-space:nowrap; animation:mpBadgePulse 2.2s ease-in-out infinite;}
+.mp-flag-suspended{background:rgba(255,201,77,.14); color:var(--yellow); border:1px solid rgba(255,201,77,.3);}
+.mp-flag-banned{background:rgba(255,93,115,.14); color:var(--red); border:1px solid rgba(255,93,115,.3);}
+@keyframes mpBadgePulse{0%,100%{opacity:1;} 50%{opacity:.6;}}
+
+.mp-actions-cell{position:relative; text-align:right;}
+.mp-kebab{
+  width:30px; height:30px; border-radius:9px; background:var(--glass); border:1px solid var(--border);
+  color:var(--muted); display:inline-flex; align-items:center; justify-content:center; transition:.15s;
+}
+.mp-kebab:hover, .mp-kebab.open{color:var(--text); border-color:var(--border-hi); background:rgba(255,255,255,.08);}
+.mp-menu{
+  position:absolute; z-index:50; top:calc(100% + 6px); right:0; min-width:200px;
+  padding:6px; display:flex; flex-direction:column; gap:1px; animation:mpPopIn .14s ease;
+  max-height:70vh; overflow-y:auto;
+}
+.mp-menu-item{
+  display:flex; align-items:center; gap:9px; text-align:left; padding:8px 10px; border-radius:8px;
+  font-size:12.5px; color:var(--text); background:none; transition:.12s; white-space:nowrap;
+}
+.mp-menu-item:hover{background:var(--glass);}
+.mp-menu-item.danger{color:var(--red);}
+.mp-menu-item.danger:hover{background:rgba(255,93,115,.12);}
+.mp-menu-item:disabled{opacity:.35; cursor:not-allowed;}
+.mp-menu-item:disabled:hover{background:none;}
+.mp-menu-sep{height:1px; background:var(--border); margin:5px 2px;}
+
+.mp-pagination{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:16px;}
+.mp-page-btn{
+  width:32px; height:32px; border-radius:9px; background:var(--glass); border:1px solid var(--border);
+  color:var(--text); display:inline-flex; align-items:center; justify-content:center; font-size:12.5px; transition:.15s;
+}
+.mp-page-btn:hover:not(:disabled){border-color:var(--border-hi);}
+.mp-page-btn:disabled{opacity:.3; cursor:not-allowed;}
+.mp-page-btn.active{background:linear-gradient(90deg,var(--blue),var(--purple)); color:#fff; border-color:transparent;}
+
+.mp-modal-danger-box{
+  background:rgba(255,93,115,.08); border:1px solid rgba(255,93,115,.28); border-radius:12px;
+  padding:12px 14px; font-size:12px; color:#ffb3bd; line-height:1.6; margin-bottom:14px;
+}
+.mp-type-confirm input{
+  width:100%; background:rgba(255,255,255,.05); border:1px solid var(--border); border-radius:10px;
+  padding:9px 12px; color:var(--text); font-size:13px; font-family:'JetBrains Mono',monospace; outline:none; margin-top:8px;
+}
+.mp-type-confirm input:focus{border-color:var(--red); box-shadow:0 0 0 3px rgba(255,93,115,.12);}
+
+.mp-video-row{display:flex; align-items:center; gap:12px; padding:9px 4px; border-bottom:1px solid var(--border);}
+.mp-video-row:last-child{border:none;}
+.mp-video-title{font-size:12.5px; font-weight:600;}
+.mp-video-date{font-size:10.5px; color:var(--muted2); margin-top:2px;}
+
+.mp-role-pick-row{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 8px; border-radius:9px; transition:.12s;}
+.mp-role-pick-row:hover{background:var(--glass);}
+
+.mp-fade-in{animation:mpRowIn .22s ease both;}

@@ -3,16 +3,11 @@
 import { useEffect, useState } from "react";
 import { useAuth, isAdmin, isOwnerOrCoOwner } from "@/lib/client/AuthContext";
 import { useToast } from "../Toast";
-import { Rank, rankForLevel, rankBounds, displayRankName } from "@/lib/ranks";
-import RoleBadge from "../RoleBadge";
+import { Rank, rankForLevel, rankBounds } from "@/lib/ranks";
 import StatusPermissionsView from "./StatusPermissionsView";
-import CustomRoleBadge, { CustomRole } from "../CustomRoleBadge";
-import CustomRoleManager from "../CustomRoleManager";
+import ManagePlayersView from "./ManagePlayersView";
 
 type DashTab = "review" | "users" | "analytics" | "announce" | "ranks" | "permissions";
-
-const ROLE_CYCLE = ["Member", "Verified", "Helper", "Moderator", "Admin", "Co-Owner", "Owner"];
-const roleLabel = (r: string) => r;
 
 export default function DashboardView({
   ranks,
@@ -31,10 +26,6 @@ export default function DashboardView({
   const [users, setUsers] = useState<any[]>([]);
   const [annTitle, setAnnTitle] = useState("");
   const [annBody, setAnnBody] = useState("");
-  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
-  const [showRoleManager, setShowRoleManager] = useState(false);
-  const [assignPickerFor, setAssignPickerFor] = useState<string | null>(null);
-  const [createRoleFor, setCreateRoleFor] = useState<string | null>(null);
 
   async function loadQueue() {
     const res = await fetch("/api/submissions?status=pending");
@@ -46,33 +37,11 @@ export default function DashboardView({
     const data = await res.json();
     setUsers(data.users ?? []);
   }
-  async function loadCustomRoles() {
-    const res = await fetch("/api/custom-roles");
-    const data = await res.json();
-    setCustomRoles(data.roles ?? []);
-  }
 
   useEffect(() => {
     loadQueue();
     loadUsers();
-    loadCustomRoles();
   }, []);
-
-  async function assignRole(userId: string, roleId: string) {
-    const res = await fetch(`/api/users/${userId}/roles`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role_id: roleId }),
-    });
-    if (!res.ok) return toast((await res.json()).error || "Could not assign role.");
-    setAssignPickerFor(null);
-    loadUsers();
-  }
-  async function unassignRole(userId: string, roleId: string) {
-    const res = await fetch(`/api/users/${userId}/roles/${roleId}`, { method: "DELETE" });
-    if (!res.ok) return toast("Could not remove role.");
-    loadUsers();
-  }
 
   const tabs: DashTab[] = admin
     ? [
@@ -106,60 +75,6 @@ export default function DashboardView({
     if (!res.ok) return toast("Could not delete.");
     toast("Submission deleted.");
     loadQueue();
-  }
-
-  async function setLevel(u: any, value: string) {
-    const raw = value.trim();
-    const current = u.level_label ?? String(u.level);
-    if (!raw || raw === current) return;
-    const res = await fetch(`/api/users/${u.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ level: raw }),
-    });
-    if (!res.ok) return toast((await res.json()).error || "Could not update.");
-    toast(`${u.username} is now "${raw}"`);
-    loadUsers();
-  }
-  async function cycleRole(u: any) {
-    const next = ROLE_CYCLE[(ROLE_CYCLE.indexOf(u.role) + 1) % ROLE_CYCLE.length];
-    const res = await fetch(`/api/users/${u.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role: next }),
-    });
-    const data = await res.json();
-    if (!res.ok) return toast(data.error || "Could not update role.");
-    toast(`${u.username} is now ${roleLabel(next)}`);
-    loadUsers();
-  }
-  async function toggleSuspend(u: any) {
-    const res = await fetch(`/api/users/${u.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ suspended: !u.suspended }),
-    });
-    if (!res.ok) return toast("Could not update.");
-    toast(`${u.username} ${u.suspended ? "unsuspended" : "suspended"}.`);
-    loadUsers();
-  }
-  async function toggleBan(u: any) {
-    const res = await fetch(`/api/users/${u.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ banned: !u.banned }),
-    });
-    if (!res.ok) return toast("Could not update ban status.");
-    toast(`${u.username} has been ${u.banned ? "unbanned" : "banned"}.`);
-    loadUsers();
-  }
-  async function deleteUser(u: any) {
-    if (!window.confirm(`Permanently delete ${u.username}'s account? This can't be undone.`)) return;
-    const res = await fetch(`/api/users/${u.id}`, { method: "DELETE" });
-    const data = await res.json();
-    if (!res.ok) return toast(data.error || "Could not delete.");
-    toast(`${u.username} deleted.`);
-    loadUsers();
   }
 
   async function postAnnouncement() {
@@ -340,183 +255,7 @@ export default function DashboardView({
         </div>
       )}
 
-      {tab === "users" && (
-        <div>
-          {admin && (
-            <div className="flex gap8 mb18" style={{ justifyContent: "flex-end" }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowRoleManager(true)}>
-                + Create Custom Role
-              </button>
-            </div>
-          )}
-          <div className="card" style={{ padding: "6px 10px" }}>
-          <table>
-            <tbody>
-              <tr>
-                <th>User</th>
-                <th>Status</th>
-                <th>Level</th>
-                <th>Rank</th>
-                <th>Roles</th>
-                <th>Approved</th>
-                {admin && <th>Actions</th>}
-              </tr>
-              {users.map((u) => (
-                <tr key={u.id}>
-                  <td className="flex gap10">
-                    <div className="avatar" style={{ width: 28, height: 28, fontSize: 10 }}>
-                      {u.username.slice(0, 2).toUpperCase()}
-                    </div>
-                    {u.username}
-                    {u.suspended && (
-                      <span className="pill" style={{ color: "var(--yellow)", marginLeft: 6 }}>
-                        Suspended
-                      </span>
-                    )}
-                    {u.banned && (
-                      <span className="pill" style={{ color: "var(--red)", marginLeft: 6 }}>
-                        Banned
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    <RoleBadge role={u.role} />
-                  </td>
-                  <td className="mono">
-                    {admin ? (
-                      <input
-                        type="text"
-                        defaultValue={u.level_label ?? u.level}
-                        className="mono"
-                        style={{
-                          width: 72,
-                          background: "rgba(255,255,255,.05)",
-                          border: "1px solid var(--border)",
-                          borderRadius: 8,
-                          padding: "5px 8px",
-                          color: "var(--text)",
-                        }}
-                        onBlur={(e) => setLevel(u, e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                        }}
-                      />
-                    ) : (
-                      u.level_label ?? u.level
-                    )}
-                  </td>
-                  <td>{displayRankName(ranks, u)}</td>
-                  <td style={{ position: "relative", minWidth: 140 }}>
-                    <div className="flex gap8" style={{ flexWrap: "wrap", alignItems: "center" }}>
-                      {(u.custom_roles ?? []).map((r: CustomRole) => (
-                        <CustomRoleBadge
-                          key={r.id}
-                          role={r}
-                          size="sm"
-                          onRemove={admin ? () => unassignRole(u.id, r.id) : undefined}
-                        />
-                      ))}
-                      {admin && (
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          style={{ padding: "1px 7px" }}
-                          onClick={() =>
-                            setAssignPickerFor(assignPickerFor === u.id ? null : u.id)
-                          }
-                        >
-                          +
-                        </button>
-                      )}
-                    </div>
-                    {assignPickerFor === u.id && (
-                      <div
-                        className="popover"
-                        style={{
-                          position: "absolute",
-                          zIndex: 20,
-                          top: "100%",
-                          left: 0,
-                          marginTop: 4,
-                          padding: 8,
-                          minWidth: 160,
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 6,
-                        }}
-                      >
-                        {customRoles
-                          .filter((r) => !(u.custom_roles ?? []).some((ur: CustomRole) => ur.id === r.id))
-                          .map((r) => (
-                            <button
-                              key={r.id}
-                              className="btn btn-ghost btn-sm"
-                              style={{ justifyContent: "flex-start" }}
-                              onClick={() => assignRole(u.id, r.id)}
-                            >
-                              <CustomRoleBadge role={r} size="sm" />
-                            </button>
-                          ))}
-                        {customRoles.length === 0 && (
-                          <span className="muted small">No custom roles yet.</span>
-                        )}
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          style={{ justifyContent: "flex-start", borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 2 }}
-                          onClick={() => {
-                            setAssignPickerFor(null);
-                            setCreateRoleFor(u.id);
-                            setShowRoleManager(true);
-                          }}
-                        >
-                          + Custom Role
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                  <td className="mono">{u.approved_count}</td>
-                  {admin && (
-                    <td>
-                      <div className="flex gap8" style={{ flexWrap: "wrap" }}>
-                        <button className="btn btn-ghost btn-sm" onClick={() => cycleRole(u)}>
-                          Status
-                        </button>
-                        <button className="btn btn-ghost btn-sm" onClick={() => toggleSuspend(u)}>
-                          {u.suspended ? "Unsuspend" : "Suspend"}
-                        </button>
-                        <button className="btn btn-danger btn-sm" onClick={() => toggleBan(u)}>
-                          {u.banned ? "Unban" : "Ban"}
-                        </button>
-                        <button className="btn btn-danger btn-sm" onClick={() => deleteUser(u)}>
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        </div>
-      )}
-
-      {showRoleManager && (
-        <CustomRoleManager
-          roles={customRoles}
-          startInCreate={!!createRoleFor}
-          onClose={() => {
-            setShowRoleManager(false);
-            if (createRoleFor) {
-              setAssignPickerFor(createRoleFor);
-              setCreateRoleFor(null);
-            }
-          }}
-          onChanged={() => {
-            loadCustomRoles();
-            loadUsers();
-          }}
-        />
-      )}
+      {tab === "users" && <ManagePlayersView ranks={ranks} />}
 
       {tab === "analytics" && (
         <div className="grid2">
