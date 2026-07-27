@@ -28,6 +28,7 @@ type Video = {
   custom_roles: CustomRole[];
   likes: number;
   dislikes: number;
+  is_following: boolean;
   comment_count: number;
   my_vote: 1 | -1 | null;
 };
@@ -82,7 +83,13 @@ function savePosition(id: number, t: number) {
   } catch {}
 }
 
-export default function ShortsView({ ranks }: { ranks: Rank[] }) {
+export default function ShortsView({
+  ranks,
+  onVisit,
+}: {
+  ranks: Rank[];
+  onVisit?: (userId: string) => void;
+}) {
   const { user, can } = useAuth();
   const { toast } = useToast();
 
@@ -296,6 +303,26 @@ export default function ShortsView({ ranks }: { ranks: Rank[] }) {
     }
   }
 
+  async function toggleFollow(v: Video) {
+    if (!requireAuth()) return;
+    if (v.user_id === user!.id) return;
+    const wasFollowing = v.is_following;
+    setVideos((list) =>
+      list.map((x) => (x.user_id === v.user_id ? { ...x, is_following: !wasFollowing } : x))
+    );
+    try {
+      const res = await fetch(`/api/users/${v.user_id}/follow`, {
+        method: wasFollowing ? "DELETE" : "POST",
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setVideos((list) =>
+        list.map((x) => (x.user_id === v.user_id ? { ...x, is_following: wasFollowing } : x))
+      );
+      toast("Could not update follow status.");
+    }
+  }
+
   async function share(v: Video) {
     const url = `${window.location.origin}/?video=${v.id}`;
     try {
@@ -411,6 +438,9 @@ export default function ShortsView({ ranks }: { ranks: Rank[] }) {
             onFullscreen={toggleFullscreen}
             canModerate={can("manage_shorts")}
             onModerate={(action) => moderate(v, action)}
+            onVisit={onVisit}
+            onToggleFollow={() => toggleFollow(v)}
+            isSelf={v.user_id === user?.id}
           />
         ))}
       </div>
@@ -513,6 +543,9 @@ function ShortsCard({
   onFullscreen,
   canModerate,
   onModerate,
+  onVisit,
+  onToggleFollow,
+  isSelf,
 }: {
   video: Video;
   isActive: boolean;
@@ -533,6 +566,9 @@ function ShortsCard({
   onFullscreen: () => void;
   canModerate: boolean;
   onModerate: (action: string) => void;
+  onVisit?: (userId: string) => void;
+  onToggleFollow: () => void;
+  isSelf: boolean;
 }) {
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -673,10 +709,16 @@ function ShortsCard({
       {/* bottom-left info */}
       <div className="shorts-info">
         <div className="flex gap8 mb8" style={{ alignItems: "center", flexWrap: "wrap" }}>
-          <div className="avatar" style={{ width: 34, height: 34, fontSize: 12 }}>
+          <div
+            className="avatar"
+            style={{ width: 34, height: 34, fontSize: 12, cursor: onVisit ? "pointer" : undefined }}
+            onClick={() => onVisit?.(video.user_id)}
+          >
             {video.username.slice(0, 2).toUpperCase()}
           </div>
-          <b>{video.username}</b>
+          <b style={{ cursor: onVisit ? "pointer" : undefined }} onClick={() => onVisit?.(video.user_id)}>
+            {video.username}
+          </b>
           <RoleBadge role={video.role} />
           {(video.custom_roles ?? []).map((r) => (
             <CustomRoleBadge key={r.id} role={r} size="sm" />
@@ -684,6 +726,14 @@ function ShortsCard({
           <span className="pill">
             {displayLevel(video)} · {displayRankName(ranks, video)}
           </span>
+          {!isSelf && (
+            <button
+              className={`btn btn-sm ${video.is_following ? "btn-ghost" : "btn-primary"}`}
+              onClick={onToggleFollow}
+            >
+              {video.is_following ? "Following" : "+ Follow"}
+            </button>
+          )}
         </div>
         <div style={{ fontWeight: 700, fontSize: 15 }}>{video.title}</div>
         {video.description && (

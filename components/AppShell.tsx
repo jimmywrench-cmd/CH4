@@ -391,7 +391,7 @@ export default function AppShell() {
           }`}
         >
           {view === "home" && <HomeView ranks={ranks} go={go} />}
-          {view === "shorts" && <ShortsView ranks={ranks} />}
+          {view === "shorts" && <ShortsView ranks={ranks} onVisit={visit} />}
           {view === "submit" && <SubmitView ranks={ranks} />}
           {view === "leaderboard" && <LeaderboardView ranks={ranks} onVisit={visit} />}
           {view === "chat" && <ChatView onVisit={visit} />}

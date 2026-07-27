@@ -66,7 +66,10 @@ export async function GET(req: NextRequest) {
          (select count(*) from video_likes vl where vl.submission_id = s.id and vl.value = 1)::int as likes,
          (select count(*) from video_likes vl where vl.submission_id = s.id and vl.value = -1)::int as dislikes,
          (select count(*) from video_comments vc where vc.submission_id = s.id and not vc.deleted)::int as comment_count,
-         (select vl.value from video_likes vl where vl.submission_id = s.id and vl.user_id = $1) as my_vote
+         (select vl.value from video_likes vl where vl.submission_id = s.id and vl.user_id = $1) as my_vote,
+         (exists(
+            select 1 from follows f where f.follower_id = $1 and f.following_id = u.id
+          )) as is_following
        from submissions s
        join users u on u.id = s.user_id
        where ${conditions.join(" and ")}
