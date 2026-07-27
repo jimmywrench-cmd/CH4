@@ -40,7 +40,6 @@
   --glow: 0 0 0 rgba(0,0,0,0);
 }
 *{box-sizing:border-box; margin:0; padding:0;}
-html{zoom:.9;}
 html,body{height:100%;}
 body{
   background:
