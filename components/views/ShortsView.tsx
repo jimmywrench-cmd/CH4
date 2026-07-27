@@ -102,6 +102,7 @@ export default function ShortsView({
   const [q, setQ] = useState("");
   const [tag, setTag] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [statsEditVideo, setStatsEditVideo] = useState<Video | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
@@ -364,31 +365,20 @@ export default function ShortsView({
     }
   }
 
-  async function editStats(v: Video) {
-    const viewsRaw = window.prompt("Set view count:", String(v.view_count));
-    if (viewsRaw === null) return;
-    const likesRaw = window.prompt("Set like count:", String(v.likes));
-    if (likesRaw === null) return;
-    const dislikesRaw = window.prompt("Set dislike count:", String(v.dislikes));
-    if (dislikesRaw === null) return;
-
-    const view_count = Number(viewsRaw);
-    const likes = Number(likesRaw);
-    const dislikes = Number(dislikesRaw);
-    if ([view_count, likes, dislikes].some((n) => !Number.isFinite(n) || n < 0)) {
-      toast("Stats must be non-negative numbers.");
-      return;
-    }
-
+  async function saveStats(v: Video, view_count: number, likes: number, dislikes: number) {
     const res = await fetch(`/api/feed/${v.id}/stats`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ view_count, likes, dislikes }),
     });
     const data = await res.json();
-    if (!res.ok) return toast(data.error || "Could not update stats.");
+    if (!res.ok) {
+      toast(data.error || "Could not update stats.");
+      return false;
+    }
     setVideos((list) => list.map((x) => (x.id === v.id ? { ...x, ...data.video } : x)));
     toast("Stats updated.");
+    return true;
   }
 
   if (loading) {
@@ -466,7 +456,7 @@ export default function ShortsView({
             canModerate={can("manage_shorts")}
             onModerate={(action) => moderate(v, action)}
             canEditStats={can("edit_video_stats")}
-            onEditStats={() => editStats(v)}
+            onEditStats={() => setStatsEditVideo(v)}
             onVisit={onVisit}
             onToggleFollow={() => toggleFollow(v)}
             isSelf={v.user_id === user?.id}
@@ -484,6 +474,17 @@ export default function ShortsView({
         <CommentsPanel video={current} onClose={() => setCommentsOpen(false)} onCountChange={(n) =>
           setVideos((list) => list.map((x) => (x.id === current.id ? { ...x, comment_count: n } : x)))
         } />
+      )}
+
+      {statsEditVideo && (
+        <EditStatsModal
+          video={statsEditVideo}
+          onClose={() => setStatsEditVideo(null)}
+          onSave={async (view_count, likes, dislikes) => {
+            const ok = await saveStats(statsEditVideo, view_count, likes, dislikes);
+            if (ok) setStatsEditVideo(null);
+          }}
+        />
       )}
     </div>
   );
@@ -1000,6 +1001,86 @@ function CommentsPanel({
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function EditStatsModal({
+  video,
+  onClose,
+  onSave,
+}: {
+  video: Video;
+  onClose: () => void;
+  onSave: (view_count: number, likes: number, dislikes: number) => void | Promise<void>;
+}) {
+  const [viewCount, setViewCount] = useState(String(video.view_count));
+  const [likes, setLikes] = useState(String(video.likes));
+  const [dislikes, setDislikes] = useState(String(video.dislikes));
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const v = Number(viewCount);
+    const l = Number(likes);
+    const d = Number(dislikes);
+    if ([v, l, d].some((n) => !Number.isFinite(n) || n < 0)) {
+      setError("Stats must be non-negative numbers.");
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      await onSave(v, l, d);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-title">Edit Stats</div>
+        <div className="modal-sub">{video.title}</div>
+
+        <div className="field" style={{ marginTop: 14 }}>
+          <label>Views</label>
+          <input
+            type="number"
+            min={0}
+            value={viewCount}
+            onChange={(e) => setViewCount(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label>Likes</label>
+          <input type="number" min={0} value={likes} onChange={(e) => setLikes(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Dislikes</label>
+          <input
+            type="number"
+            min={0}
+            value={dislikes}
+            onChange={(e) => setDislikes(e.target.value)}
+          />
+        </div>
+
+        {error && (
+          <div className="small" style={{ color: "var(--red, #ff6b6b)", marginBottom: 8 }}>
+            {error}
+          </div>
+        )}
+
+        <div className="flex gap8" style={{ justifyContent: "flex-end", marginTop: 8 }}>
+          <button className="btn btn-ghost btn-sm" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={save} disabled={saving}>
+            {saving ? <span className="spinner" /> : "Save"}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -53,6 +53,7 @@ export default function ProfileView({
   const [listUsers, setListUsers] = useState<any[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [editFollowersOpen, setEditFollowersOpen] = useState(false);
 
   function reloadActivity() {
     if (!isOwn) return;
@@ -150,15 +151,8 @@ export default function ProfileView({
     }
   }
 
-  async function editFollowerCount() {
-    if (!profile) return;
-    const raw = window.prompt("Set follower count:", String(profile.follower_count));
-    if (raw === null) return;
-    const n = Number(raw);
-    if (!Number.isFinite(n) || n < 0) {
-      toast("Follower count must be a non-negative number.");
-      return;
-    }
+  async function saveFollowerCount(n: number) {
+    if (!profile) return false;
     const res = await fetch(`/api/users/${profile.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -167,10 +161,11 @@ export default function ProfileView({
     const data = await res.json();
     if (!res.ok) {
       toast(data.error || "Could not update follower count.");
-      return;
+      return false;
     }
     setProfile((p) => (p ? { ...p, follower_count: data.user.follower_count } : p));
     toast("Follower count updated.");
+    return true;
   }
 
   return (
@@ -226,7 +221,7 @@ export default function ProfileView({
                 <button
                   className="icon-btn"
                   title="Edit follower count"
-                  onClick={editFollowerCount}
+                  onClick={() => setEditFollowersOpen(true)}
                   style={{ width: 26, height: 26 }}
                 >
                   ✎
@@ -409,6 +404,84 @@ export default function ProfileView({
       {uploadOpen && (
         <UploadShortModal onClose={() => setUploadOpen(false)} onUploaded={reloadActivity} />
       )}
+
+      {editFollowersOpen && profile && (
+        <EditFollowerCountModal
+          username={profile.username}
+          current={profile.follower_count}
+          onClose={() => setEditFollowersOpen(false)}
+          onSave={async (n) => {
+            const ok = await saveFollowerCount(n);
+            if (ok) setEditFollowersOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditFollowerCountModal({
+  username,
+  current,
+  onClose,
+  onSave,
+}: {
+  username: string;
+  current: number;
+  onClose: () => void;
+  onSave: (n: number) => void | Promise<void>;
+}) {
+  const [value, setValue] = useState(String(current));
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0) {
+      setError("Follower count must be a non-negative number.");
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      await onSave(n);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-title">Edit Follower Count</div>
+        <div className="modal-sub">@{username}</div>
+
+        <div className="field" style={{ marginTop: 14 }}>
+          <label>Followers</label>
+          <input
+            type="number"
+            min={0}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            autoFocus
+          />
+        </div>
+
+        {error && (
+          <div className="small" style={{ color: "var(--red, #ff6b6b)", marginBottom: 8 }}>
+            {error}
+          </div>
+        )}
+
+        <div className="flex gap8" style={{ justifyContent: "flex-end", marginTop: 8 }}>
+          <button className="btn btn-ghost btn-sm" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={save} disabled={saving}>
+            {saving ? <span className="spinner" /> : "Save"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
