@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   }
 
   const rows = await query(
-    `select m.id, m.text, m.reply_to_id, m.pinned, m.created_at,
+    `select m.id, m.text, m.reply_to_id, m.pinned, m.created_at, m.edited_at,
             u.id as user_id, u.username, u.role, u.level, u.level_label,
             r.id as reply_user_id, r.username as reply_username, rm.text as reply_text,
             coalesce(
@@ -33,7 +33,22 @@ export async function GET(req: NextRequest) {
                join custom_roles cr on cr.id = ucr.role_id
                where ucr.user_id = u.id),
               '[]'::json
-            ) as custom_roles
+            ) as custom_roles,
+            coalesce(
+              (select json_agg(
+                 json_build_object('emoji', x.emoji, 'count', x.count, 'reacted', x.reacted)
+                 order by x.first_at
+               )
+               from (
+                 select emoji, count(*)::int as count,
+                        bool_or(user_id = $2) as reacted,
+                        min(created_at) as first_at
+                 from chat_reactions
+                 where message_id = m.id
+                 group by emoji
+               ) x),
+              '[]'::json
+            ) as reactions
      from chat_messages m
      join users u on u.id = m.user_id
      left join chat_messages rm on rm.id = m.reply_to_id and not rm.deleted
@@ -41,7 +56,7 @@ export async function GET(req: NextRequest) {
      where not m.deleted and m.room_id = $1
      order by m.created_at asc
      limit 200`,
-    [room.id]
+    [room.id, guarded.user.id]
   );
 
   return NextResponse.json({ messages: rows });

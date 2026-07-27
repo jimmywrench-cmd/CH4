@@ -27,6 +27,77 @@ function initials(name: string) {
   return (name || "").slice(0, 2).toUpperCase();
 }
 
+// Same window used elsewhere in the app (HomeView, ManagePlayersView)
+// so "online" means the same thing everywhere.
+const ONLINE_WINDOW_MS = 15 * 60 * 1000;
+function isOnline(lastSeen?: string | null) {
+  if (!lastSeen) return false;
+  return Date.now() - new Date(lastSeen).getTime() < ONLINE_WINDOW_MS;
+}
+
+function timeAgo(iso: string) {
+  const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+const QUICK_EMOJI = ["👍", "❤️", "😂", "😮", "😢", "🔥", "🎉", "✅"];
+
+// Lightweight markdown: **bold**, *italic*/_italic_, `code`. No
+// nesting/escaping beyond what a chat box needs.
+function renderMarkdown(segment: string, keyBase: string): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  const re = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|_[^_]+_)/g;
+  let last = 0;
+  let i = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(segment))) {
+    if (m.index > last) out.push(segment.slice(last, m.index));
+    const t = m[0];
+    if (t.startsWith("**")) {
+      out.push(<b key={`${keyBase}-b${i++}`}>{t.slice(2, -2)}</b>);
+    } else if (t.startsWith("`")) {
+      out.push(
+        <code className="msg-inline-code" key={`${keyBase}-c${i++}`}>
+          {t.slice(1, -1)}
+        </code>
+      );
+    } else {
+      out.push(<i key={`${keyBase}-i${i++}`}>{t.slice(1, -1)}</i>);
+    }
+    last = m.index + t.length;
+  }
+  if (last < segment.length) out.push(segment.slice(last));
+  return out;
+}
+
+// Mentions (@username) get a pill; everything else runs through the
+// lite markdown pass above.
+function renderRichText(text: string): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  const mentionRe = /@([a-zA-Z0-9_]{3,20})/g;
+  let last = 0;
+  let key = 0;
+  let m: RegExpExecArray | null;
+  while ((m = mentionRe.exec(text))) {
+    if (m.index > last) out.push(...renderMarkdown(text.slice(last, m.index), `t${key}`));
+    out.push(
+      <span className="msg-mention" key={`men-${key++}`}>
+        @{m[1]}
+      </span>
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(...renderMarkdown(text.slice(last), `t${key}`));
+  return out;
+}
+
 export default function ChatView() {
   const { user, can } = useAuth();
   const { toast } = useToast();
@@ -50,6 +121,17 @@ export default function ChatView() {
   const [messagesError, setMessagesError] = useState<string | null>(null);
   const [deletingRoom, setDeletingRoom] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const [profilePopover, setProfilePopover] = useState<{ member: any; x: number; y: number } | null>(
+    null
+  );
+  const [reactingTo, setReactingTo] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionStart, setMentionStart] = useState(-1);
 
   // Only Owner/Co-Owner can manage rooms/channels or moderate chat —
   // everything else here (starting DMs and group chats, messaging in
@@ -144,6 +226,10 @@ export default function ChatView() {
     setMessagesLoading(true);
     setMessages([]);
     setShowPinned(false);
+    setEditingId(null);
+    setReactingTo(null);
+    setProfilePopover(null);
+    setMentionQuery(null);
     loadMessages();
     const id = setInterval(loadMessages, 4000);
     return () => clearInterval(id);
@@ -217,6 +303,86 @@ export default function ChatView() {
     }
   }
 
+  async function react(id: number, emoji: string) {
+    setReactingTo(null);
+    try {
+      const res = await fetch(`/api/chat/${id}/react`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji }),
+      });
+      if (res.ok) loadMessages();
+      else {
+        const data = await safeJson(res);
+        toast(data.error || "Could not react to that message.");
+      }
+    } catch {
+      toast("Could not reach the server to react.");
+    }
+  }
+
+  function startEdit(m: any) {
+    setEditingId(m.id);
+    setEditText(m.text);
+  }
+
+  async function saveEdit(id: number) {
+    const text = editText.trim();
+    if (!text) return;
+    try {
+      const res = await fetch(`/api/chat/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (res.ok) {
+        setEditingId(null);
+        loadMessages();
+      } else {
+        const data = await safeJson(res);
+        toast(data.error || "Could not save that edit.");
+      }
+    } catch {
+      toast("Could not reach the server to save that edit.");
+    }
+  }
+
+  function openProfile(e: React.MouseEvent, member: any) {
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = Math.min(rect.left, window.innerWidth - 280);
+    const y = Math.min(rect.bottom + 6, window.innerHeight - 260);
+    setProfilePopover({ member, x: Math.max(8, x), y: Math.max(8, y) });
+  }
+
+  function memberInfo(userId: string, fallback: any) {
+    return panelMembers.find((m) => m.id === userId) ?? fallback;
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const val = e.target.value;
+    setInput(val);
+    const caret = e.target.selectionStart ?? val.length;
+    const upto = val.slice(0, caret);
+    const m = upto.match(/(?:^|\s)@([a-zA-Z0-9_]{0,20})$/);
+    if (m) {
+      setMentionQuery(m[1].toLowerCase());
+      setMentionStart(caret - m[1].length - 1);
+    } else {
+      setMentionQuery(null);
+      setMentionStart(-1);
+    }
+  }
+
+  function pickMention(username: string) {
+    const caret = mentionStart + 1 + (mentionQuery?.length ?? 0);
+    const next = `${input.slice(0, mentionStart)}@${username} ${input.slice(caret)}`;
+    setInput(next);
+    setMentionQuery(null);
+    setMentionStart(-1);
+    inputRef.current?.focus();
+  }
+
   async function deleteRoom(slug: string) {
     if (slug === "general") return;
     if (!window.confirm(`Delete #${slug}? This permanently deletes the room and its messages.`)) {
@@ -258,15 +424,48 @@ export default function ChatView() {
   // Who shows in the right-hand member panel: everyone for a room,
   // just this group's members for a DM.
   const panelMembers = active.type === "room" ? roomMembers : dmMembers;
+  const onlineCount = useMemo(
+    () => panelMembers.filter((m) => isOnline(m.last_seen)).length,
+    [panelMembers]
+  );
   const memberGroups = useMemo(() => {
     const buckets: Record<string, any[]> = {};
     for (const m of panelMembers) {
       (buckets[m.role] ??= []).push(m);
     }
+    for (const list of Object.values(buckets)) {
+      list.sort((a, b) => {
+        const onlineDiff = Number(isOnline(b.last_seen)) - Number(isOnline(a.last_seen));
+        return onlineDiff !== 0 ? onlineDiff : a.username.localeCompare(b.username);
+      });
+    }
     return STATUSES.map((status) => ({ status, members: buckets[status] ?? [] })).filter(
       (g) => g.members.length > 0
     );
   }, [panelMembers]);
+
+  const mentionCandidates = useMemo(() => {
+    if (mentionQuery === null) return [];
+    return panelMembers
+      .filter((m) => m.username.toLowerCase().startsWith(mentionQuery))
+      .slice(0, 6);
+  }, [mentionQuery, panelMembers]);
+
+  // Rooms grouped into Discord-style categories, in the order the
+  // API returns them (category first, "general" pinned to the top).
+  const roomCategories = useMemo(() => {
+    const order: string[] = [];
+    const buckets: Record<string, any[]> = {};
+    for (const r of rooms) {
+      const cat = r.category || "Text Channels";
+      if (!buckets[cat]) {
+        buckets[cat] = [];
+        order.push(cat);
+      }
+      buckets[cat].push(r);
+    }
+    return order.map((cat) => ({ category: cat, rooms: buckets[cat] }));
+  }, [rooms]);
 
   return (
     <div>
@@ -277,6 +476,13 @@ export default function ChatView() {
       <div className={`chat-wrap chat-wrap-discord${showMembers ? "" : " members-hidden"}`}>
         {/* CONVERSATION LIST */}
         <div className="card chat-sidebar">
+          <div className="chat-server-banner">
+            <div className="chat-server-icon">C4</div>
+            <div className="chat-server-info">
+              <div className="chat-server-name">Channel4</div>
+              <div className="chat-server-sub">Ops Network</div>
+            </div>
+          </div>
           {sidebarError && (
             <div className="notice small" style={{ marginBottom: 4 }}>
               {sidebarError}
@@ -293,47 +499,72 @@ export default function ChatView() {
               </button>
             </div>
           )}
-          <div className="chat-sidebar-section">
-            <div className="chat-sidebar-head">
-              <span>Rooms</span>
-              {canCreateRooms && (
-                <button className="icon-btn-sm" title="New room" onClick={() => setShowNewRoom(true)}>
-                  +
-                </button>
-              )}
+          {rooms.length === 0 && !sidebarError && (
+            <div className="empty-state small" style={{ padding: "10px 12px" }}>
+              No rooms yet.
             </div>
-            {rooms.length === 0 && !sidebarError && (
-              <div className="empty-state small" style={{ padding: "10px 12px" }}>
-                No rooms yet.
-              </div>
-            )}
-            {rooms.map((r) => (
-              <div key={r.id} className="chat-convo-row">
-                <button
-                  className={`chat-convo-item${
-                    active.type === "room" && active.slug === r.slug ? " active" : ""
-                  }`}
-                  onClick={() => setActive({ type: "room", slug: r.slug })}
+          )}
+          {roomCategories.map(({ category, rooms: catRooms }) => {
+            const collapsed = collapsedCategories.has(category);
+            return (
+              <div className="chat-sidebar-section" key={category}>
+                <div
+                  className="chat-sidebar-head chat-category-head"
+                  onClick={() =>
+                    setCollapsedCategories((prev) => {
+                      const next = new Set(prev);
+                      next.has(category) ? next.delete(category) : next.add(category);
+                      return next;
+                    })
+                  }
                 >
-                  <span className="chat-convo-hash">#</span>
-                  {r.name}
-                </button>
-                {canDeleteRooms && r.slug !== "general" && (
-                  <button
-                    className="chat-convo-delete"
-                    title={`Delete #${r.slug}`}
-                    disabled={deletingRoom === r.slug}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteRoom(r.slug);
-                    }}
-                  >
-                    {deletingRoom === r.slug ? "…" : "🗑"}
-                  </button>
-                )}
+                  <span>
+                    <span className={`chat-category-chevron${collapsed ? " collapsed" : ""}`}>▾</span>
+                    {category}
+                  </span>
+                  {canCreateRooms && (
+                    <button
+                      className="icon-btn-sm"
+                      title="New room"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowNewRoom(true);
+                      }}
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
+                {!collapsed &&
+                  catRooms.map((r) => (
+                    <div key={r.id} className="chat-convo-row">
+                      <button
+                        className={`chat-convo-item${
+                          active.type === "room" && active.slug === r.slug ? " active" : ""
+                        }`}
+                        onClick={() => setActive({ type: "room", slug: r.slug })}
+                      >
+                        <span className="chat-convo-hash">#</span>
+                        {r.name}
+                      </button>
+                      {canDeleteRooms && r.slug !== "general" && (
+                        <button
+                          className="chat-convo-delete"
+                          title={`Delete #${r.slug}`}
+                          disabled={deletingRoom === r.slug}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteRoom(r.slug);
+                          }}
+                        >
+                          {deletingRoom === r.slug ? "…" : "🗑"}
+                        </button>
+                      )}
+                    </div>
+                  ))}
               </div>
-            ))}
-          </div>
+            );
+          })}
 
           <div className="chat-sidebar-section">
             <div className="chat-sidebar-head">
@@ -374,10 +605,16 @@ export default function ChatView() {
                 : groupLabel(activeGroup)}
             </span>
             {active.type === "room" && activeRoom?.description && (
-              <span className="small muted">{activeRoom.description}</span>
+              <>
+                <span className="chat-head-divider" />
+                <span className="small muted">{activeRoom.description}</span>
+              </>
             )}
             {active.type === "dm" && (
-              <span className="small muted">{dmMembers.length} members</span>
+              <>
+                <span className="chat-head-divider" />
+                <span className="small muted">{dmMembers.length} members</span>
+              </>
             )}
             <div className="chat-head-actions">
               {active.type === "room" && pinnedMessages.length > 0 && (
@@ -472,7 +709,23 @@ export default function ChatView() {
                         })}
                       </span>
                     ) : (
-                      <div className="avatar" style={{ width: 32, height: 32, fontSize: 11 }}>
+                      <div
+                        className="avatar"
+                        style={{ width: 32, height: 32, fontSize: 11, cursor: "pointer" }}
+                        onClick={(e) =>
+                          openProfile(
+                            e,
+                            memberInfo(m.user_id, {
+                              id: m.user_id,
+                              username: m.username,
+                              role: m.role,
+                              level: m.level,
+                              level_label: m.level_label,
+                              custom_roles: m.custom_roles,
+                            })
+                          )
+                        }
+                      >
                         {initials(m.username)}
                       </div>
                     )}
@@ -484,7 +737,25 @@ export default function ChatView() {
                       )}
                       {!grouped && (
                         <div className="msg-top">
-                          <span className="msg-name">{m.username}</span>
+                          <span
+                            className="msg-name"
+                            style={{ cursor: "pointer" }}
+                            onClick={(e) =>
+                              openProfile(
+                                e,
+                                memberInfo(m.user_id, {
+                                  id: m.user_id,
+                                  username: m.username,
+                                  role: m.role,
+                                  level: m.level,
+                                  level_label: m.level_label,
+                                  custom_roles: m.custom_roles,
+                                })
+                              )
+                            }
+                          >
+                            {m.username}
+                          </span>
                           <RoleBadge role={m.role} />
                           {(m.custom_roles ?? []).map((r: CustomRole) => (
                             <CustomRoleBadge key={r.id} role={r} size="sm" />
@@ -496,12 +767,64 @@ export default function ChatView() {
                           {m.pinned && <span className="msg-pin-flag">📌 pinned</span>}
                         </div>
                       )}
-                      <div className="msg-text">{m.text}</div>
+                      {editingId === m.id ? (
+                        <div className="msg-edit-row">
+                          <input
+                            value={editText}
+                            autoFocus
+                            onChange={(e) => setEditText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") saveEdit(m.id);
+                              if (e.key === "Escape") setEditingId(null);
+                            }}
+                          />
+                          <button className="btn btn-ghost btn-sm" onClick={() => setEditingId(null)}>
+                            Cancel
+                          </button>
+                          <button className="btn btn-primary btn-sm" onClick={() => saveEdit(m.id)}>
+                            Save
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="msg-text">
+                          {renderRichText(m.text)}
+                          {m.edited_at && <span className="msg-edited-flag"> (edited)</span>}
+                        </div>
+                      )}
+                      {active.type === "room" && (m.reactions ?? []).length > 0 && (
+                        <div className="msg-reactions">
+                          {m.reactions.map((r: any) => (
+                            <button
+                              key={r.emoji}
+                              className={`msg-reaction${r.reacted ? " mine" : ""}`}
+                              onClick={() => react(m.id, r.emoji)}
+                              title={r.reacted ? "Remove your reaction" : "React"}
+                            >
+                              <span>{r.emoji}</span>
+                              <span className="msg-reaction-count">{r.count}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="msg-actions">
                       <button className="msg-act-btn" title="Reply" onClick={() => setReplyTo(m)}>
                         ↩
                       </button>
+                      {active.type === "room" && (
+                        <button
+                          className="msg-act-btn"
+                          title="React"
+                          onClick={() => setReactingTo(reactingTo === m.id ? null : m.id)}
+                        >
+                          😀
+                        </button>
+                      )}
+                      {active.type === "room" && own && (
+                        <button className="msg-act-btn" title="Edit" onClick={() => startEdit(m)}>
+                          ✏️
+                        </button>
+                      )}
                       {canPin && (
                         <button
                           className="msg-act-btn"
@@ -517,6 +840,18 @@ export default function ChatView() {
                         </button>
                       )}
                     </div>
+                    {reactingTo === m.id && (
+                      <>
+                        <div className="popover-overlay" onClick={() => setReactingTo(null)} />
+                        <div className="msg-reaction-picker">
+                          {QUICK_EMOJI.map((e) => (
+                            <button key={e} className="msg-reaction-picker-btn" onClick={() => react(m.id, e)}>
+                              {e}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 );
               })}
@@ -531,23 +866,44 @@ export default function ChatView() {
               <button onClick={() => setReplyTo(null)}>✕</button>
             </div>
           )}
-          <div className="chat-input-wrap">
-            <input
-              placeholder={active.type === "room" ? `Message #${active.slug}` : "Message this group"}
-              value={input}
-              disabled={!!messagesError}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") send();
-              }}
-            />
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={send}
-              disabled={!input.trim() || sending || !!messagesError}
-            >
-              {sending ? "Sending…" : "Send"}
-            </button>
+          <div className="chat-input-wrap-outer">
+            {mentionCandidates.length > 0 && (
+              <div className="mention-dropdown">
+                {mentionCandidates.map((m: any) => (
+                  <button key={m.id} className="mention-dropdown-item" onClick={() => pickMention(m.username)}>
+                    <div className="avatar" style={{ width: 20, height: 20, fontSize: 9 }}>
+                      {initials(m.username)}
+                    </div>
+                    {m.username}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="chat-input-wrap">
+              <input
+                ref={inputRef}
+                placeholder={active.type === "room" ? `Message #${active.slug}` : "Message this group"}
+                value={input}
+                disabled={!!messagesError}
+                onChange={handleInputChange}
+                onKeyDown={(e) => {
+                  if (mentionCandidates.length > 0 && (e.key === "Enter" || e.key === "Tab")) {
+                    e.preventDefault();
+                    pickMention(mentionCandidates[0].username);
+                    return;
+                  }
+                  if (e.key === "Escape") setMentionQuery(null);
+                  if (e.key === "Enter") send();
+                }}
+              />
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={send}
+                disabled={!input.trim() || sending || !!messagesError}
+              >
+                {sending ? "Sending…" : "Send"}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -555,7 +911,7 @@ export default function ChatView() {
         {showMembers && (
           <div className="card chat-members">
             <div className="chat-members-head">
-              Members — {panelMembers.length}
+              {onlineCount} Online — {panelMembers.length} Members
             </div>
             {memberGroups.length === 0 && (
               <div className="empty-state small" style={{ padding: "10px 12px" }}>
@@ -568,11 +924,21 @@ export default function ChatView() {
                   {status} — {members.length}
                 </div>
                 {members.map((m: any) => (
-                  <div className="member-row" key={m.id}>
-                    <div className="avatar" style={{ width: 26, height: 26, fontSize: 10 }}>
-                      {initials(m.username)}
+                  <div
+                    className="member-row"
+                    key={m.id}
+                    onClick={(e) => openProfile(e, m)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <div className="member-avatar-wrap">
+                      <div className="avatar" style={{ width: 26, height: 26, fontSize: 10 }}>
+                        {initials(m.username)}
+                      </div>
+                      <span className={`member-status-dot${isOnline(m.last_seen) ? " online" : ""}`} />
                     </div>
-                    <span className="member-name">{m.username}</span>
+                    <span className={`member-name${isOnline(m.last_seen) ? "" : " offline"}`}>
+                      {m.username}
+                    </span>
                     {(m.custom_roles ?? []).slice(0, 1).map((r: CustomRole) => (
                       <CustomRoleBadge key={r.id} role={r} size="sm" />
                     ))}
@@ -583,6 +949,47 @@ export default function ChatView() {
           </div>
         )}
       </div>
+
+      {profilePopover && (
+        <>
+          <div className="popover-overlay" onClick={() => setProfilePopover(null)} />
+          <div
+            className="card profile-popover"
+            style={{ left: profilePopover.x, top: profilePopover.y }}
+          >
+            <div className="profile-popover-avatar-row">
+              <div className="avatar profile-popover-avatar">
+                {initials(profilePopover.member.username)}
+              </div>
+              <span
+                className={`profile-status-dot${
+                  isOnline(profilePopover.member.last_seen) ? " online" : ""
+                }`}
+              />
+            </div>
+            <div className="profile-popover-name">{profilePopover.member.username}</div>
+            <div className="profile-popover-badges">
+              <RoleBadge role={profilePopover.member.role} />
+              {(profilePopover.member.custom_roles ?? []).map((r: CustomRole) => (
+                <CustomRoleBadge key={r.id} role={r} size="sm" />
+              ))}
+            </div>
+            <div className="profile-popover-level">
+              {profilePopover.member.level_label ?? `Level ${profilePopover.member.level}`}
+            </div>
+            {profilePopover.member.bio && (
+              <div className="profile-popover-bio">{profilePopover.member.bio}</div>
+            )}
+            {profilePopover.member.last_seen && (
+              <div className="profile-popover-meta">
+                {isOnline(profilePopover.member.last_seen)
+                  ? "Online now"
+                  : `Last seen ${timeAgo(profilePopover.member.last_seen)}`}
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {showNewGroup && (
         <NewGroupModal
@@ -597,6 +1004,7 @@ export default function ChatView() {
       {showNewRoom && (
         <NewRoomModal
           onClose={() => setShowNewRoom(false)}
+          categories={roomCategories.map((c) => c.category)}
           onCreated={(slug) => {
             setShowNewRoom(false);
             loadRooms();

@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   const rows = await query(
     `select u.id, u.username, u.role, u.level, u.level_label, u.approved_count, u.rejected_count,
-            u.last_seen, u.created_at,
+            u.last_seen, u.created_at, u.bio,
             coalesce(
               (select json_agg(
                  json_build_object(

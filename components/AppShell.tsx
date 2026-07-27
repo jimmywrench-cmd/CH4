@@ -348,7 +348,11 @@ export default function AppShell() {
           </div>
         </div>
 
-        <div className={`view active${view === "shorts" ? " view-shorts" : ""}`}>
+        <div
+          className={`view active${view === "shorts" ? " view-shorts" : ""}${
+            view === "chat" ? " view-chat" : ""
+          }`}
+        >
           {view === "home" && <HomeView ranks={ranks} go={go} />}
           {view === "shorts" && <ShortsView ranks={ranks} />}
           {view === "submit" && <SubmitView ranks={ranks} />}
