@@ -240,11 +240,25 @@ export default function ShortsView({ ranks }: { ranks: Rank[] }) {
     el.paused ? el.play() : el.pause();
   }
 
-  async function vote(v: Video, value: 1 | -1) {
+  function requireAuth() {
+    if (!user) {
+      toast("Log in to react to clips.");
+      return false;
+    }
+    return true;
+  }
+
+  // `force` skips the toggle-off behavior — used for double-tap-to-like,
+  // which should only ever add a like, never remove one.
+  async function vote(v: Video, value: 1 | -1, force = false) {
+    if (!requireAuth()) return;
+    if (force && v.my_vote === value) return;
+
+    const prev = { my_vote: v.my_vote, likes: v.likes, dislikes: v.dislikes };
     setVideos((list) =>
       list.map((x) => {
         if (x.id !== v.id) return x;
-        const removing = x.my_vote === value;
+        const removing = !force && x.my_vote === value;
         let likes = x.likes;
         let dislikes = x.dislikes;
         // undo the previous vote, if any
@@ -258,11 +272,18 @@ export default function ShortsView({ ranks }: { ranks: Rank[] }) {
         return { ...x, likes, dislikes, my_vote: removing ? null : value };
       })
     );
-    await fetch(`/api/feed/${v.id}/like`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ value }),
-    });
+    try {
+      const res = await fetch(`/api/feed/${v.id}/like`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      // roll back the optimistic update if the request failed
+      setVideos((list) => list.map((x) => (x.id === v.id ? { ...x, ...prev } : x)));
+      toast("Could not save your reaction.");
+    }
   }
 
   async function share(v: Video) {
@@ -277,6 +298,7 @@ export default function ShortsView({ ranks }: { ranks: Rank[] }) {
   }
 
   async function report(v: Video) {
+    if (!requireAuth()) return;
     const reason = window.prompt("What's wrong with this clip?");
     if (!reason || !reason.trim()) return;
     const res = await fetch(`/api/feed/${v.id}/report`, {
@@ -316,7 +338,7 @@ export default function ShortsView({ ranks }: { ranks: Rank[] }) {
   if (videos.length === 0) {
     return (
       <div>
-        <ShortsSearchBar q={q} tag={tag} setQ={setQ} setTag={setTag} onSearch={load} show={true} setShow={setShowSearch} sort={sort} setSort={setSort} />
+        <ShortsSearchBar q={q} tag={tag} setQ={setQ} setTag={setTag} onSearch={load} show={showSearch} setShow={setShowSearch} sort={sort} setSort={setSort} />
         <div className="empty-state">No clips match yet — approved submissions show up here.</div>
       </div>
     );
@@ -356,9 +378,13 @@ export default function ShortsView({ ranks }: { ranks: Rank[] }) {
             onTogglePlay={() => togglePlay(v)}
             onEnded={() => setActive((a) => Math.min(videos.length - 1, a + 1))}
             onVote={(val) => vote(v, val)}
+            onLike={() => vote(v, 1, true)}
             onShare={() => share(v)}
             onReport={() => report(v)}
-            onOpenComments={() => setCommentsOpen(true)}
+            onOpenComments={() => {
+              if (!user) return toast("Log in to view and post comments.");
+              setCommentsOpen(true);
+            }}
             onToggleMute={toggleMute}
             onSetVolume={setVolume}
             onFullscreen={toggleFullscreen}
@@ -457,6 +483,7 @@ function ShortsCard({
   onTogglePlay,
   onEnded,
   onVote,
+  onLike,
   onShare,
   onReport,
   onOpenComments,
@@ -476,6 +503,7 @@ function ShortsCard({
   onTogglePlay: () => void;
   onEnded: () => void;
   onVote: (v: 1 | -1) => void;
+  onLike: () => void;
   onShare: () => void;
   onReport: () => void;
   onOpenComments: () => void;
@@ -513,7 +541,7 @@ function ShortsCard({
     if (now - lastClick.current < 300) {
       setLikeBurst(true);
       setTimeout(() => setLikeBurst(false), 700);
-      onVote(1);
+      onLike();
     } else {
       onTogglePlay();
     }
