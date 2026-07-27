@@ -202,15 +202,8 @@ export default function DashboardView({
       {tab === "review" && (
         <div>
           {queue.length === 0 ? (
-            <div className="card empty-state">
-              <div className="empty-state-icon">✅</div>
-              <div className="empty-state-title">You&rsquo;re all caught up!</div>
-              <div className="empty-state-sub">
-                No pending clips right now — nice work keeping the queue clear.
-              </div>
-              <button className="btn btn-ghost btn-sm" onClick={loadQueue}>
-                Refresh
-              </button>
+            <div className="card muted" style={{ padding: 30, textAlign: "center" }}>
+              Queue is empty — nice work.
             </div>
           ) : (
             queue.map((s) => (

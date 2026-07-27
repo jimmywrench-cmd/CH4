@@ -9,9 +9,9 @@ export async function GET() {
   if ("error" in guarded) return guarded.error;
 
   const rows = await query(
-    `select id, slug, name, description, category, created_at
+    `select id, slug, name, description, created_at
      from chat_rooms
-     order by (category = 'Text Channels') desc, category asc, (slug = 'general') desc, name asc`
+     order by (slug = 'general') desc, name asc`
   );
 
   return NextResponse.json({ rooms: rows });
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   const guarded = await requirePermission("create_chat_rooms");
   if ("error" in guarded) return guarded.error;
 
-  let body: { slug?: string; name?: string; description?: string; category?: string };
+  let body: { slug?: string; name?: string; description?: string };
   try {
     body = await req.json();
   } catch {
@@ -31,7 +31,6 @@ export async function POST(req: NextRequest) {
   const slug = (body.slug || "").trim().toLowerCase();
   const name = (body.name || "").trim();
   const description = (body.description || "").trim();
-  const category = (body.category || "").trim().slice(0, 40) || "Text Channels";
 
   if (!SLUG_RE.test(slug)) {
     return NextResponse.json(
@@ -49,10 +48,10 @@ export async function POST(req: NextRequest) {
   }
 
   const room = await queryOne(
-    `insert into chat_rooms (slug, name, description, category, created_by)
-     values ($1, $2, $3, $4, $5)
-     returning id, slug, name, description, category, created_at`,
-    [slug, name, description, category, guarded.user.id]
+    `insert into chat_rooms (slug, name, description, created_by)
+     values ($1, $2, $3, $4)
+     returning id, slug, name, description, created_at`,
+    [slug, name, description, guarded.user.id]
   );
 
   return NextResponse.json({ room });

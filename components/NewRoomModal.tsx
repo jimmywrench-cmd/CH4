@@ -5,15 +5,12 @@ import { useState } from "react";
 export default function NewRoomModal({
   onClose,
   onCreated,
-  categories = [],
 }: {
   onClose: () => void;
   onCreated: (slug: string) => void;
-  categories?: string[];
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("Text Channels");
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -32,12 +29,7 @@ export default function NewRoomModal({
       const res = await fetch("/api/chat/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          slug,
-          name: name.trim(),
-          description: description.trim(),
-          category: category.trim() || "Text Channels",
-        }),
+        body: JSON.stringify({ slug, name: name.trim(), description: description.trim() }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -66,21 +58,6 @@ export default function NewRoomModal({
           style={{ marginBottom: 8 }}
         />
         {slug && <div className="muted small" style={{ marginBottom: 8 }}>#{slug}</div>}
-        <input
-          type="text"
-          list="room-category-list"
-          placeholder="Category (e.g. Text Channels)"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          style={{ marginBottom: 8 }}
-        />
-        {categories.length > 0 && (
-          <datalist id="room-category-list">
-            {categories.map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
-        )}
         <input
           type="text"
           placeholder="Description (optional)"
