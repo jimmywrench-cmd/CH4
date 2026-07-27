@@ -9,19 +9,25 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   const [ruleBreaker, setRuleBreaker] = useState("");
   const [desc, setDesc] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [trimStart, setTrimStart] = useState(0);
+  const [trimEnd, setTrimEnd] = useState(100);
+
+  const [processing, setProcessing] = useState(false);
+  const [processPct, setProcessPct] = useState(0);
   const [uploadPct, setUploadPct] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [videoPath, setVideoPath] = useState<string | null>(null);
-  const [trimStart, setTrimStart] = useState(22);
-  const [trimEnd, setTrimEnd] = useState(62);
+
   const [submitting, setSubmitting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const timelineRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!file) {
@@ -35,24 +41,140 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
 
   if (!user) return null;
 
-  const ready = !!(videoPath && ruleBreaker.trim() && !submitting);
-  const durationSec = (((trimEnd - trimStart) / 100) * 30).toFixed(1); // assumes ~30s source, visual only
+  const durationSec = videoDuration
+    ? (((trimEnd - trimStart) / 100) * videoDuration).toFixed(1)
+    : "—";
+  const trimmed = !!videoPath;
+  const readyToTrim = !!(file && videoDuration > 0 && !processing && !uploading);
+  const readyToSubmit = !!(trimmed && ruleBreaker.trim() && !submitting);
 
-  async function handleFile(f: File) {
+  function selectFile(f: File) {
     setFile(f);
     setVideoPath(null);
+    setVideoDuration(0);
+    setTrimStart(0);
+    setTrimEnd(100);
+  }
+
+  function onLoadedMetadata() {
+    const d = videoRef.current?.duration;
+    if (!d || !Number.isFinite(d)) return;
+    setVideoDuration(d);
+    // Default to the first 30s (or the whole clip, if shorter) so there's
+    // already something sensible to submit before anyone drags a handle.
+    setTrimEnd(d > 30 ? (30 / d) * 100 : 100);
+  }
+
+  function dragTrimHandle(e: React.PointerEvent, which: "start" | "end") {
+    const rect = timelineRef.current?.getBoundingClientRect();
+    if (!rect || !rect.width) return;
+    const pct = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
+    if (which === "start") setTrimStart(Math.min(pct, trimEnd - 1));
+    else setTrimEnd(Math.max(pct, trimStart + 1));
+  }
+
+  // Cuts out just the selected window using the browser's own
+  // decode/record pipeline (captureStream + MediaRecorder) — no
+  // server-side ffmpeg needed. It has to play through the trimmed
+  // section in real time to capture it, so this takes as long as
+  // the clip itself.
+  async function trimAndUpload() {
+    if (!file || !videoRef.current || !videoDuration) return;
+    const videoEl = videoRef.current;
+    const startSec = (trimStart / 100) * videoDuration;
+    const endSec = (trimEnd / 100) * videoDuration;
+    if (endSec - startSec < 0.4) {
+      toast("Select at least half a second to submit.");
+      return;
+    }
+
+    const canCapture = typeof (videoEl as any).captureStream === "function";
+    if (!canCapture) {
+      // Fall back to uploading the untrimmed file rather than blocking
+      // submission entirely on an older/unsupported browser.
+      toast("This browser can't trim locally — uploading the full clip instead.");
+      setVideoPath(null);
+      await uploadBlob(file, file.name);
+      return;
+    }
+
+    setProcessing(true);
+    setProcessPct(0);
+    setVideoPath(null);
+    const wasMuted = videoEl.muted;
+
+    try {
+      const stream: MediaStream = (videoEl as any).captureStream();
+
+      const mimeType = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find(
+        (t) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(t)
+      );
+      if (!mimeType) throw new Error("no-recorder-format");
+
+      const recorder = new MediaRecorder(stream, { mimeType });
+      const chunks: BlobPart[] = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size) chunks.push(e.data);
+      };
+      const stopped = new Promise<Blob>((resolve, reject) => {
+        recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+        recorder.onerror = () => reject(new Error("Recording failed."));
+      });
+
+      // Mute local playback only — captureStream taps the decoded
+      // audio track directly, so the recording keeps sound either way.
+      videoEl.muted = true;
+      videoEl.currentTime = startSec;
+      await new Promise<void>((resolve) => {
+        const onSeeked = () => {
+          videoEl.removeEventListener("seeked", onSeeked);
+          resolve();
+        };
+        videoEl.addEventListener("seeked", onSeeked);
+      });
+
+      recorder.start();
+      await videoEl.play();
+
+      await new Promise<void>((resolve) => {
+        function onTimeUpdate() {
+          setProcessPct(
+            Math.min(100, Math.max(0, ((videoEl.currentTime - startSec) / (endSec - startSec)) * 100))
+          );
+          if (videoEl.currentTime >= endSec) {
+            videoEl.removeEventListener("timeupdate", onTimeUpdate);
+            resolve();
+          }
+        }
+        videoEl.addEventListener("timeupdate", onTimeUpdate);
+      });
+
+      videoEl.pause();
+      recorder.stop();
+      const blob = await stopped;
+
+      await uploadBlob(blob, "clip.webm");
+    } catch (err) {
+      console.error(err);
+      toast("Could not trim that clip locally — try adjusting the handles and try again.");
+    } finally {
+      videoEl.muted = wasMuted;
+      setProcessing(false);
+    }
+  }
+
+  async function uploadBlob(blob: Blob, filename: string) {
     setUploading(true);
     setUploadPct(0);
     try {
       const signRes = await fetch("/api/uploads/sign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: f.name }),
+        body: JSON.stringify({ filename }),
       });
       const signData = await signRes.json();
       if (!signRes.ok) {
         toast(signData.error || "Could not start upload.");
-        setUploading(false);
         return;
       }
 
@@ -64,11 +186,11 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
         };
         xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject());
         xhr.onerror = () => reject();
-        xhr.send(f);
+        xhr.send(blob);
       });
 
       setVideoPath(signData.path);
-      toast("Clip uploaded.");
+      toast("Clip trimmed and uploaded.");
     } catch {
       toast("Upload failed. Try again.");
     } finally {
@@ -77,7 +199,7 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
   }
 
   async function submitClip() {
-    if (!ready || !user) return;
+    if (!readyToSubmit || !user) return;
     setSubmitting(true);
     try {
       const res = await fetch("/api/submissions", {
@@ -105,22 +227,15 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
       setRuleBreaker("");
       setFile(null);
       setVideoPath(null);
-      setTrimStart(22);
-      setTrimEnd(62);
+      setVideoDuration(0);
+      setTrimStart(0);
+      setTrimEnd(100);
     } finally {
       setSubmitting(false);
     }
   }
 
   const bounds = rankBounds(ranks);
-
-  function dragTrimHandle(e: React.PointerEvent, which: "start" | "end") {
-    const rect = timelineRef.current?.getBoundingClientRect();
-    if (!rect || !rect.width) return;
-    const pct = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
-    if (which === "start") setTrimStart(Math.min(pct, trimEnd - 1));
-    else setTrimEnd(Math.max(pct, trimStart + 1));
-  }
 
   return (
     <div>
@@ -162,7 +277,7 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
                 e.preventDefault();
                 setDragOver(false);
                 const f = e.dataTransfer.files?.[0];
-                if (f) handleFile(f);
+                if (f) selectFile(f);
               }}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
@@ -175,14 +290,9 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
               <div className="muted small" style={{ marginTop: 4 }}>
                 or click to browse · MP4, MOV, WEBM
               </div>
-              {uploading && (
-                <div className="upload-progress">
-                  <div className="upload-progress-fill" style={{ width: `${uploadPct}%` }} />
-                </div>
-              )}
-              {videoPath && !uploading && (
+              {trimmed && !uploading && !processing && (
                 <div className="small" style={{ color: "var(--green)", marginTop: 8 }}>
-                  ✓ Uploaded
+                  ✓ Trimmed clip uploaded
                 </div>
               )}
             </div>
@@ -193,7 +303,7 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
               style={{ display: "none" }}
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) handleFile(f);
+                if (f) selectFile(f);
               }}
             />
           </div>
@@ -211,7 +321,14 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
               </div>
               <div className="trimmer">
                 {videoUrl && (
-                  <video src={videoUrl} controls playsInline className="trim-video" />
+                  <video
+                    ref={videoRef}
+                    src={videoUrl}
+                    controls
+                    playsInline
+                    className="trim-video"
+                    onLoadedMetadata={onLoadedMetadata}
+                  />
                 )}
                 <div className="trim-timeline" ref={timelineRef}>
                   <div className="trim-thumbs">
@@ -243,6 +360,31 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
                   <span className="trim-info mono">Clip duration: ~{durationSec}s</span>
                   <span className="small muted">Drag the handles to trim the clip</span>
                 </div>
+
+                <div style={{ marginTop: 16 }}>
+                  {(processing || uploading) && (
+                    <div className="upload-progress" style={{ marginBottom: 10 }}>
+                      <div
+                        className="upload-progress-fill"
+                        style={{ width: `${processing ? processPct : uploadPct}%` }}
+                      />
+                    </div>
+                  )}
+                  <button
+                    className="btn btn-ghost"
+                    disabled={!readyToTrim}
+                    onClick={trimAndUpload}
+                    style={{ width: "100%", justifyContent: "center", padding: 12 }}
+                  >
+                    {processing
+                      ? "Trimming clip…"
+                      : uploading
+                      ? "Uploading…"
+                      : trimmed
+                      ? "Re-trim clip"
+                      : "Trim & Upload Clip"}
+                  </button>
+                </div>
               </div>
             </>
           )}
@@ -250,7 +392,7 @@ export default function SubmitView({ ranks }: { ranks: Rank[] }) {
           <div style={{ marginTop: 22 }}>
             <button
               className="btn btn-primary"
-              disabled={!ready}
+              disabled={!readyToSubmit}
               onClick={submitClip}
               style={{ width: "100%", justifyContent: "center", padding: 13 }}
             >
