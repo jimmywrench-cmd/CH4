@@ -182,8 +182,12 @@ export async function PATCH(
         );
       }
       const target = Math.trunc(Number(body.follower_count));
-      if (!Number.isFinite(target) || target < 0) {
-        return NextResponse.json({ error: "Invalid follower count." }, { status: 400 });
+      const MAX_FOLLOWERS = 1_000_000_000;
+      if (!Number.isFinite(target) || target < 0 || target > MAX_FOLLOWERS) {
+        return NextResponse.json(
+          { error: `Follower count must be a non-negative number up to ${MAX_FOLLOWERS.toLocaleString()}.` },
+          { status: 400 }
+        );
       }
       const real = await queryOne<{ count: string }>(
         `select count(*)::text as count from follows where following_id = $1`,
@@ -201,7 +205,7 @@ export async function PATCH(
     const rows = await query(
       `update users set ${sets.join(", ")} where id = $${values.length}
        returning id, username, role, level, level_label, suspended, banned,
-         (select greatest(0, count(*)::int + users.follower_offset) from follows where following_id = users.id) as follower_count`,
+         (select greatest(0, count(*) + users.follower_offset) from follows where following_id = users.id) as follower_count`,
       values
     );
     if (!rows[0]) return NextResponse.json({ error: "User not found." }, { status: 404 });

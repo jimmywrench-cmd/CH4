@@ -437,8 +437,9 @@ function EditFollowerCountModal({
 
   async function save() {
     const n = Number(value);
-    if (!Number.isFinite(n) || n < 0) {
-      setError("Follower count must be a non-negative number.");
+    const MAX_FOLLOWERS = 1_000_000_000;
+    if (!Number.isFinite(n) || n < 0 || n > MAX_FOLLOWERS) {
+      setError(`Follower count must be a non-negative number up to ${MAX_FOLLOWERS.toLocaleString()}.`);
       return;
     }
     setError(null);
@@ -461,6 +462,7 @@ function EditFollowerCountModal({
           <input
             type="number"
             min={0}
+            max={1_000_000_000}
             value={value}
             onChange={(e) => setValue(e.target.value)}
             autoFocus

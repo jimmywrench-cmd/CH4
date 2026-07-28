@@ -28,17 +28,26 @@ export async function PATCH(
   const sets: string[] = [];
   const values: any[] = [];
 
+  // view_count is a plain `integer` column, so cap well under the
+  // int4 ceiling (~2.1 billion) — and keep offsets in the same
+  // range so `likes * 3` in the feed's trending sort can never
+  // overflow, even though the offset columns themselves are bigint.
+  const MAX_STAT = 1_000_000_000;
+
   function asNonNegativeInt(v: unknown): number | null {
     if (v === undefined || v === null) return null;
     const n = Math.trunc(Number(v));
-    if (!Number.isFinite(n) || n < 0) return null;
+    if (!Number.isFinite(n) || n < 0 || n > MAX_STAT) return null;
     return n;
   }
 
   if (body.view_count !== undefined) {
     const v = asNonNegativeInt(body.view_count);
     if (v === null) {
-      return NextResponse.json({ error: "view_count must be a non-negative number." }, { status: 400 });
+      return NextResponse.json(
+        { error: `view_count must be a non-negative number up to ${MAX_STAT.toLocaleString()}.` },
+        { status: 400 }
+      );
     }
     values.push(v);
     sets.push(`view_count = $${values.length}`);
@@ -47,7 +56,10 @@ export async function PATCH(
   if (body.likes !== undefined) {
     const target = asNonNegativeInt(body.likes);
     if (target === null) {
-      return NextResponse.json({ error: "likes must be a non-negative number." }, { status: 400 });
+      return NextResponse.json(
+        { error: `likes must be a non-negative number up to ${MAX_STAT.toLocaleString()}.` },
+        { status: 400 }
+      );
     }
     const real = await queryOne<{ count: string }>(
       `select count(*)::text as count from video_likes where submission_id = $1 and value = 1`,
@@ -60,7 +72,10 @@ export async function PATCH(
   if (body.dislikes !== undefined) {
     const target = asNonNegativeInt(body.dislikes);
     if (target === null) {
-      return NextResponse.json({ error: "dislikes must be a non-negative number." }, { status: 400 });
+      return NextResponse.json(
+        { error: `dislikes must be a non-negative number up to ${MAX_STAT.toLocaleString()}.` },
+        { status: 400 }
+      );
     }
     const real = await queryOne<{ count: string }>(
       `select count(*)::text as count from video_likes where submission_id = $1 and value = -1`,
@@ -78,8 +93,8 @@ export async function PATCH(
   const rows = await query(
     `update submissions set ${sets.join(", ")} where id = $${values.length}
      returning id, view_count,
-       greatest(0, (select count(*) from video_likes vl where vl.submission_id = submissions.id and vl.value = 1)::int + like_offset) as likes,
-       greatest(0, (select count(*) from video_likes vl where vl.submission_id = submissions.id and vl.value = -1)::int + dislike_offset) as dislikes`,
+       greatest(0, (select count(*) from video_likes vl where vl.submission_id = submissions.id and vl.value = 1) + like_offset) as likes,
+       greatest(0, (select count(*) from video_likes vl where vl.submission_id = submissions.id and vl.value = -1) + dislike_offset) as dislikes`,
     values
   );
   if (!rows[0]) return NextResponse.json({ error: "Video not found." }, { status: 404 });

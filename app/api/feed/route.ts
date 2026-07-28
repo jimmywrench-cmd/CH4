@@ -66,8 +66,8 @@ export async function GET(req: NextRequest) {
             where ucr.user_id = u.id),
            '[]'::json
          ) as custom_roles,
-         greatest(0, (select count(*) from video_likes vl where vl.submission_id = s.id and vl.value = 1)::int + s.like_offset) as likes,
-         greatest(0, (select count(*) from video_likes vl where vl.submission_id = s.id and vl.value = -1)::int + s.dislike_offset) as dislikes,
+         greatest(0, (select count(*) from video_likes vl where vl.submission_id = s.id and vl.value = 1) + s.like_offset) as likes,
+         greatest(0, (select count(*) from video_likes vl where vl.submission_id = s.id and vl.value = -1) + s.dislike_offset) as dislikes,
          (select count(*) from video_comments vc where vc.submission_id = s.id and not vc.deleted)::int as comment_count,
          (select vl.value from video_likes vl where vl.submission_id = s.id and vl.user_id = $1) as my_vote,
          (exists(

@@ -1025,8 +1025,9 @@ function EditStatsModal({
     const v = Number(viewCount);
     const l = Number(likes);
     const d = Number(dislikes);
-    if ([v, l, d].some((n) => !Number.isFinite(n) || n < 0)) {
-      setError("Stats must be non-negative numbers.");
+    const MAX_STAT = 1_000_000_000;
+    if ([v, l, d].some((n) => !Number.isFinite(n) || n < 0 || n > MAX_STAT)) {
+      setError(`Stats must be non-negative numbers up to ${MAX_STAT.toLocaleString()}.`);
       return;
     }
     setError(null);
@@ -1049,19 +1050,27 @@ function EditStatsModal({
           <input
             type="number"
             min={0}
+            max={1_000_000_000}
             value={viewCount}
             onChange={(e) => setViewCount(e.target.value)}
           />
         </div>
         <div className="field">
           <label>Likes</label>
-          <input type="number" min={0} value={likes} onChange={(e) => setLikes(e.target.value)} />
+          <input
+            type="number"
+            min={0}
+            max={1_000_000_000}
+            value={likes}
+            onChange={(e) => setLikes(e.target.value)}
+          />
         </div>
         <div className="field">
           <label>Dislikes</label>
           <input
             type="number"
             min={0}
+            max={1_000_000_000}
             value={dislikes}
             onChange={(e) => setDislikes(e.target.value)}
           />
